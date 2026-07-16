@@ -204,6 +204,9 @@ public class WeddingStore(
     public Person? PersonById(string id) =>
         Data?.People.FirstOrDefault(p => p.Id == id);
 
+    public Team? TeamById(string id) =>
+        Data?.Teams.FirstOrDefault(t => t.Id == id);
+
     /// <summary>Personnes assignées à une tâche (vide = tout le monde).</summary>
     public IEnumerable<Person> AssignedPeople(TaskItem task) =>
         task.AssignedTo

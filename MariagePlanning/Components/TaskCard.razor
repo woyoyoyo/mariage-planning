@@ -21,6 +21,21 @@
 
         <div class="form-field">
             <span class="form-label">Qui ? <span class="form-hint-inline">(personne cochée = tout le monde)</span></span>
+            @if ((Store.Data?.Teams.Count ?? 0) > 0)
+            {
+                <div class="team-checks">
+                    @foreach (var team in Store.Data!.Teams)
+                    {
+                        var t = team;
+                        var allSel = t.MemberIds.Count > 0 && t.MemberIds.All(m => _eAssigned.Contains(m));
+                        <button type="button" class="team-check @(allSel ? "is-checked" : "")"
+                                style="--person-color: @t.Color"
+                                @onclick="() => ToggleTeam(t.Id)">
+                            👥 @t.Name
+                        </button>
+                    }
+                </div>
+            }
             <div class="person-checks">
                 @foreach (var person in Store.Data?.People ?? [])
                 {
@@ -179,6 +194,17 @@ else
             _eAssigned.Add(personId);
         else
             _eAssigned.Remove(personId);
+    }
+
+    private void ToggleTeam(string teamId)
+    {
+        var team = Store.Data?.Teams.FirstOrDefault(t => t.Id == teamId);
+        if (team is null) return;
+        var allSel = team.MemberIds.Count > 0 && team.MemberIds.All(m => _eAssigned.Contains(m));
+        if (allSel)
+            foreach (var mid in team.MemberIds) _eAssigned.Remove(mid);
+        else
+            foreach (var mid in team.MemberIds) _eAssigned.Add(mid);
     }
 
     private async Task SaveEditAsync()

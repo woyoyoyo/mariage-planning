@@ -970,6 +970,90 @@ select.form-input {
 }
 
 /* --------------------------------------------------------------------------
+   Contacts (page personne)
+   -------------------------------------------------------------------------- */
+
+.contact-links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.contact-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.95);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 7px 12px;
+    word-break: break-all;
+}
+
+.contact-link:active {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* --------------------------------------------------------------------------
+   Équipes (boutons quick-select dans les formulaires de tâche)
+   -------------------------------------------------------------------------- */
+
+.team-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--color-border);
+}
+
+.team-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 2px solid var(--person-color, var(--color-border));
+    background: var(--color-card);
+    color: var(--color-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.team-check.is-checked {
+    background: var(--person-color, var(--color-primary));
+    color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Paramètres — liste personnes / équipes avec édition inline
+   -------------------------------------------------------------------------- */
+
+.people-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.people-row-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.team-member-count {
+    font-size: 12px;
+    color: var(--color-text-soft);
+    margin-left: 8px;
+}
+
+/* --------------------------------------------------------------------------
    Export PDF — impression
    -------------------------------------------------------------------------- */
 

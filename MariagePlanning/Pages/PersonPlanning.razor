@@ -34,6 +34,21 @@ else
             }
         </div>
 
+        @if (!string.IsNullOrWhiteSpace(Person.Phone) || !string.IsNullOrWhiteSpace(Person.Address))
+        {
+            <div class="contact-links no-print">
+                @if (!string.IsNullOrWhiteSpace(Person.Phone))
+                {
+                    <a href="tel:@Person.Phone" class="contact-link">📞 @Person.Phone</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(Person.Address))
+                {
+                    <a href="https://www.google.com/maps/search/?api=1&query=@Uri.EscapeDataString(Person.Address)"
+                       target="_blank" rel="noopener" class="contact-link">📍 @Person.Address</a>
+                }
+            </div>
+        }
+
         <div class="header-actions no-print">
             <button class="action-btn btn-refresh" @onclick="ShareAsync">📤 Partager sur WhatsApp</button>
             <button class="action-btn btn-print" @onclick="PrintAsync" title="Exporter en PDF">🖨️ PDF</button>

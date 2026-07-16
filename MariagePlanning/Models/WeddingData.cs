@@ -5,6 +5,7 @@ public class WeddingData
 {
     public WeddingInfo Wedding { get; set; } = new();
     public List<Person> People { get; set; } = [];
+    public List<Team> Teams { get; set; } = [];
     public List<WeddingDay> Days { get; set; } = [];
 }
 
@@ -21,9 +22,17 @@ public class Person
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
-
-    /// <summary>Couleur hex du badge (ex : "#6366f1").</summary>
     public string Color { get; set; } = "#6366f1";
+    public string? Phone { get; set; }
+    public string? Address { get; set; }
+}
+
+public class Team
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Color { get; set; } = "#94a3b8";
+    public List<string> MemberIds { get; set; } = [];
 }
 
 public class WeddingDay
