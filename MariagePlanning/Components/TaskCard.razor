@@ -18,6 +18,12 @@
             <textarea class="form-input form-textarea" @bind="_eNotes" rows="2"></textarea>
         </label>
 
+        <label class="form-field">
+            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel — lien Maps)</span></span>
+            <input class="form-input" type="text" @bind="_eLocation"
+                   placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
+        </label>
+
         @if ((Store.Data?.Contacts.Count ?? 0) > 0)
         {
             <div class="form-field">
@@ -118,6 +124,14 @@ else
             <p class="task-notes">💡 @Task.Notes</p>
         }
 
+        @if (!string.IsNullOrWhiteSpace(Task.Location))
+        {
+            <a href="@MapsUrl(Task.Location)" target="_blank" rel="noopener"
+               class="task-location" @onclick:stopPropagation="true">
+                📍 @Task.Location
+            </a>
+        }
+
         @if (Task.ContactIds.Count > 0)
         {
             <div class="task-contacts" @onclick:stopPropagation="true">
@@ -179,6 +193,7 @@ else
     private TimeOnly? _eTime;
     private string? _eTitle;
     private string? _eNotes;
+    private string? _eLocation;
     private HashSet<string> _eAssigned = [];
     private HashSet<string> _eContactIds = [];
 
@@ -213,6 +228,7 @@ else
         _eNotes = Task.Notes;
         _eAssigned = [.. Task.AssignedTo];
         _eContactIds = [.. Task.ContactIds];
+        _eLocation = Task.Location;
         _error = null;
         _editing = true;
     }
@@ -255,6 +271,7 @@ else
         var time = _eTime?.ToString("HH:mm");
         var title = _eTitle!.Trim();
         var notes = string.IsNullOrWhiteSpace(_eNotes) ? null : _eNotes.Trim();
+        var location = string.IsNullOrWhiteSpace(_eLocation) ? null : _eLocation.Trim();
         var assigned = _eAssigned.ToList();
         var contactIds = _eContactIds.ToList();
 
@@ -268,6 +285,7 @@ else
             task.Time = time;
             task.Title = title;
             task.Notes = notes;
+            task.Location = location;
             task.AssignedTo = assigned;
             task.ContactIds = contactIds;
 
@@ -315,4 +333,7 @@ else
     private static TaskItem? FindTask(WeddingData data, DateOnly date, string id) =>
         data.Days.FirstOrDefault(d => d.Date == date)?
             .Activities.FirstOrDefault(a => a.Id == id);
+
+    private static string MapsUrl(string address) =>
+        $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(address)}";
 }

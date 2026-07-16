@@ -75,5 +75,8 @@ public class TaskItem
     /// <summary>Ids des contacts (prestataires) impliqués dans cette tâche.</summary>
     public List<string> ContactIds { get; set; } = [];
 
+    /// <summary>Adresse / lieu associé à la tâche (lien Google Maps affiché sur la carte).</summary>
+    public string? Location { get; set; }
+
     public bool IsDone => Status == "done";
 }

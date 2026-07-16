@@ -1403,6 +1403,220 @@ select.form-input {
 }
 
 /* --------------------------------------------------------------------------
+   Accueil — prochaine tâche
+   -------------------------------------------------------------------------- */
+
+.next-task-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--header-grad);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    transition: opacity 0.12s;
+}
+
+.next-task-card:active { opacity: 0.88; }
+
+.next-task-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.7);
+}
+
+.next-task-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.25;
+}
+
+.next-task-meta {
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.next-task-location {
+    font-size: 13px;
+    color: rgba(255,255,255,0.9);
+    font-style: italic;
+}
+
+.next-task-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 2px;
+}
+
+.next-task-hint {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--color-text-soft);
+}
+
+.next-task-hint a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   Accueil — boutons des jours
+   -------------------------------------------------------------------------- */
+
+.home-days {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.day-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    min-height: 64px;
+}
+
+.day-nav-btn:active { background: var(--color-primary-soft); }
+
+.day-nav-wedding {
+    border-left: 4px solid #9d174d;
+}
+
+.day-nav-today {
+    background: #fef3c7;
+    border-color: #f59e0b;
+}
+
+.day-nav-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.day-nav-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-nav-date {
+    font-size: 12px;
+    color: var(--color-text-soft);
+}
+
+.day-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.day-nav-arrow {
+    font-size: 20px;
+    color: var(--color-text-soft);
+    font-weight: 300;
+    margin-left: 2px;
+}
+
+.home-add-day {
+    width: 100%;
+    border: 2px dashed var(--color-border);
+    background: transparent;
+    color: var(--color-text-soft);
+}
+
+.badge-done {
+    background: var(--color-done-soft);
+    color: var(--color-done);
+}
+
+/* --------------------------------------------------------------------------
+   Page jour — topbar + entête + gestion
+   -------------------------------------------------------------------------- */
+
+.day-page-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px 8px;
+}
+
+.day-page-back {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-decoration: none;
+    padding: 6px 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+.day-page-back:active { opacity: 0.7; }
+
+.day-header-wedding {
+    background: var(--header-grad);
+}
+
+.day-header-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.day-page-manage {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.day-manage-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Location sur une task card */
+.task-location {
+    display: block;
+    font-size: 13px;
+    color: var(--color-accent);
+    text-decoration: none;
+    margin-top: 2px;
+    word-break: break-word;
+}
+
+.task-location:active { opacity: 0.7; }
+
+/* --------------------------------------------------------------------------
    Formulaire de tâche amélioré
    -------------------------------------------------------------------------- */
 

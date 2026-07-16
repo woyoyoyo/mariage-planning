@@ -1,6 +1,7 @@
 @page "/"
 @implements IDisposable
 @inject WeddingStore Store
+@inject SettingsService Config
 @inject IJSRuntime JS
 
 <PageTitle>Mariage Planning</PageTitle>
@@ -24,76 +25,142 @@ else
 {
     <header class="page-header">
         <h1>@Store.Data.Wedding.Name</h1>
-        <div class="wedding-sub">
-            @if (Store.OrderedDays.Count > 0)
-            {
-                <span>@FrenchDate.Range(Store.OrderedDays[0].Date, Store.OrderedDays[^1].Date)</span>
-            }
-        </div>
         @if (CountdownText is not null)
         {
             <div class="wedding-countdown">@CountdownText</div>
         }
-
         @switch (Store.Source)
         {
             case DataSource.Gist:
                 <div class="sync-status sync-ok">✅ Synchronisé @SyncTime</div>
                 break;
             case DataSource.Cache:
-                <div class="sync-status sync-offline">📵 Hors ligne — données synchronisées @SyncTime</div>
+                <div class="sync-status sync-offline">📵 Hors ligne — synchronisé @SyncTime</div>
                 break;
             case DataSource.Demo:
-                <div class="sync-status sync-demo">🧪 Données de démo — <a href="parametres">configurer l'app</a></div>
+                <div class="sync-status sync-demo">🧪 Données de démo — <a href="parametres">configurer</a></div>
                 break;
         }
-        @if (Store.LoadError is not null && Store.Data is not null)
-        {
-            <div class="sync-status sync-warn">⚠️ @Store.LoadError</div>
-        }
-
         <div class="header-actions no-print">
             <button class="action-btn btn-refresh" @onclick="ReloadAsync" disabled="@_reloading">
-                @(_reloading ? "⏳ Actualisation…" : "🔄 Actualiser")
+                @(_reloading ? "⏳…" : "🔄 Actualiser")
             </button>
             <button class="action-btn btn-print" @onclick="PrintAsync" title="Exporter en PDF">🖨️ PDF</button>
         </div>
     </header>
 
-    @if ((Store.Data?.People.Count ?? 0) > 0)
+    @* Prochaine tâche *@
+    @if (_nextTask is not null && _nextDay is not null)
     {
-        <details class="stats-card" open>
-            <summary class="stats-summary">📊 Avancement — @DoneTasks / @TotalTasks tâches</summary>
-            <div class="stats-body">
-                <div class="stats-global-bar">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: @(PctAll)%"></div>
-                    </div>
-                    <span class="stats-global-pct">@PctAll %</span>
-                </div>
-                @foreach (var person in Store.Data!.People)
+        <a class="next-task-card" href="jour/@_nextDay.Date.ToString("yyyy-MM-dd")">
+            <div class="next-task-eyebrow">⏭️ Prochaine tâche</div>
+            <div class="next-task-title">@_nextTask.Title</div>
+            <div class="next-task-meta">
+                @if (_nextTask.Time is not null)
                 {
-                    var ps = PersonProgress(person);
-                    <div class="stats-person-row">
-                        <span class="stats-person-name" style="--person-color: @person.Color">@person.Name</span>
-                        <div class="progress-bar stats-mini-bar">
-                            <div class="progress-fill" style="width: @(ps.Pct)%"></div>
-                        </div>
-                        <span class="stats-person-count">@ps.Done/@ps.Total</span>
-                    </div>
+                    <span>⏰ @_nextTask.Time</span>
                 }
+                <span>📅 @FrenchDate.Long(_nextDay.Date) — @_nextDay.Label</span>
             </div>
-        </details>
+            @if (!string.IsNullOrWhiteSpace(_nextTask.Location))
+            {
+                <div class="next-task-location">📍 @_nextTask.Location</div>
+            }
+            @if (_nextTask.ContactIds.Count > 0)
+            {
+                <div class="next-task-contacts">
+                    @foreach (var cid in _nextTask.ContactIds)
+                    {
+                        var contact = Store.Data!.Contacts.FirstOrDefault(c => c.Id == cid);
+                        if (contact is null) continue;
+                        <span class="task-contact-chip">
+                            <span class="chip-name">@contact.Name</span>
+                        </span>
+                    }
+                </div>
+            }
+        </a>
+    }
+    else if (Store.Data.People.Count > 0 && Config.CurrentPerson is null)
+    {
+        <div class="next-task-hint">
+            👤 Sélectionne ton profil dans <a href="moi">l'onglet Moi</a> pour voir ta prochaine tâche.
+        </div>
     }
 
-    @foreach (var day in Store.OrderedDays)
-    {
-        <DaySection Day="day" />
-    }
+    @* Boutons des jours *@
+    <div class="home-days">
+        @foreach (var day in Store.OrderedDays)
+        {
+            var done = day.Activities.Count(t => t.IsDone);
+            var total = day.Activities.Count;
+            var isWedding = Store.IsWeddingDay(day);
+            var isToday = day.Date == DateOnly.FromDateTime(DateTime.Now);
+            <a class="day-nav-btn @(isWedding ? "day-nav-wedding" : "") @(isToday ? "day-nav-today" : "")"
+               href="jour/@day.Date.ToString("yyyy-MM-dd")">
+                <div class="day-nav-info">
+                    <span class="day-nav-label">@day.Label</span>
+                    <span class="day-nav-date">@FrenchDate.Long(day.Date)</span>
+                </div>
+                <div class="day-nav-right">
+                    @if (isWedding) { <span class="badge badge-wedding">✨</span> }
+                    @if (isToday) { <span class="badge badge-today">Auj.</span> }
+                    @if (total > 0)
+                    {
+                        <span class="badge @(done == total ? "badge-done" : "badge-todo")">@done/@total</span>
+                    }
+                    <span class="day-nav-arrow">›</span>
+                </div>
+            </a>
+        }
+
+        @if (Store.CanEdit)
+        {
+            @if (_addingDay)
+            {
+                <div class="add-form" style="margin-top: 4px">
+                    <label class="form-field">
+                        <span class="form-label">Date *</span>
+                        <input class="form-input" type="date" @bind="_newDayDate" />
+                    </label>
+                    <label class="form-field">
+                        <span class="form-label">Libellé du jour</span>
+                        <input class="form-input" type="text" @bind="_newDayLabel"
+                               placeholder="ex : J-2 — Préparation" autocapitalize="sentences" />
+                    </label>
+                    @if (_dayError is not null)
+                    {
+                        <div class="sync-status sync-warn">⚠️ @_dayError</div>
+                    }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _addingDay = false" disabled="@_dayBusy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="AddDayAsync"
+                                disabled="@(_dayBusy || _newDayDate is null)">
+                            @(_dayBusy ? "⏳…" : "📅 Ajouter ce jour")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button class="action-btn btn-add home-add-day" @onclick="() => _addingDay = true">
+                    📅 Ajouter un jour
+                </button>
+            }
+        }
+    </div>
 }
 
 @code {
     private bool _reloading;
+    private WeddingDay? _nextDay;
+    private TaskItem? _nextTask;
+
+    private bool _addingDay;
+    private DateTime? _newDayDate;
+    private string? _newDayLabel;
+    private bool _dayBusy;
+    private string? _dayError;
 
     private string SyncTime =>
         Store.LastSync is { } d ? $"le {d:dd/MM} à {d:HH\\hmm}" : "";
@@ -102,17 +169,14 @@ else
     {
         get
         {
-            if (Store.WeddingDate is not { } weddingDay)
-                return null;
+            if (Store.WeddingDate is not { } weddingDay) return null;
             var today = DateOnly.FromDateTime(DateTime.Now);
-
             if (today < weddingDay)
             {
                 var days = weddingDay.DayNumber - today.DayNumber;
                 return days == 1 ? "C'est demain ! 💍" : $"J-{days} avant le mariage 💍";
             }
-            if (today == weddingDay)
-                return "C'est le grand jour ! ✨💍";
+            if (today == weddingDay) return "C'est le grand jour ! ✨💍";
             return "Mariés ! 🥂";
         }
     }
@@ -120,36 +184,68 @@ else
     protected override async Task OnInitializedAsync()
     {
         Store.Changed += OnStoreChanged;
+        await Config.EnsureLoadedAsync();
         await Store.EnsureLoadedAsync();
+        ComputeNextTask();
     }
 
     public void Dispose() => Store.Changed -= OnStoreChanged;
 
-    private void OnStoreChanged() => InvokeAsync(StateHasChanged);
+    private void OnStoreChanged()
+    {
+        ComputeNextTask();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ComputeNextTask()
+    {
+        _nextDay = null;
+        _nextTask = null;
+        if (Store.Data is null) return;
+
+        var personId = Config.CurrentPerson;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+
+        foreach (var day in Store.OrderedDays.Where(d => d.Date >= today))
+        {
+            var task = day.Activities
+                .Where(t => !t.IsDone && (personId is null || WeddingStore.ConcernsPerson(t, personId)))
+                .OrderBy(t => t.Time ?? "99:99")
+                .FirstOrDefault();
+            if (task is not null) { _nextDay = day; _nextTask = task; break; }
+        }
+    }
 
     private async Task ReloadAsync()
     {
         _reloading = true;
         await Store.ReloadAsync();
+        ComputeNextTask();
         _reloading = false;
     }
 
     private async Task PrintAsync() =>
         await JS.InvokeVoidAsync("mariage.printPlan");
 
-    private int TotalTasks => Store.Data?.Days.Sum(d => d.Activities.Count) ?? 0;
-    private int DoneTasks => Store.Data?.Days.Sum(d => d.Activities.Count(t => t.IsDone)) ?? 0;
-    private int PctAll => TotalTasks == 0 ? 0 : (int)(DoneTasks * 100.0 / TotalTasks);
-
-    private (int Done, int Total, int Pct) PersonProgress(Person p)
+    private async Task AddDayAsync()
     {
-        if (Store.Data is null) return (0, 0, 0);
-        var tasks = Store.Data.Days
-            .SelectMany(d => d.Activities)
-            .Where(t => WeddingStore.ConcernsPerson(t, p.Id))
-            .ToList();
-        var done = tasks.Count(t => t.IsDone);
-        var total = tasks.Count;
-        return (done, total, total == 0 ? 0 : (int)(done * 100.0 / total));
+        if (_newDayDate is null) return;
+        _dayBusy = true;
+        _dayError = null;
+        var date = DateOnly.FromDateTime(_newDayDate.Value);
+        var label = string.IsNullOrWhiteSpace(_newDayLabel)
+            ? FrenchDate.Long(date)
+            : _newDayLabel.Trim();
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            if (data.Days.Any(d => d.Date == date)) return false;
+            data.Days.Add(new WeddingDay { Date = date, Label = label });
+            return true;
+        });
+
+        _dayBusy = false;
+        if (ok) { _addingDay = false; _newDayDate = null; _newDayLabel = null; }
+        else _dayError = error ?? "Ce jour existe déjà.";
     }
 }

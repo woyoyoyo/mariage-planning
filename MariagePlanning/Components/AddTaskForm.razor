@@ -31,6 +31,12 @@ else
                       placeholder="ex : Camionnette de Bernard, entrer par le portail arrière"></textarea>
         </label>
 
+        <label class="form-field">
+            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel — lien Maps)</span></span>
+            <input class="form-input" type="text" @bind="_location"
+                   placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
+        </label>
+
         @if ((Store.Data?.Contacts.Count ?? 0) > 0)
         {
             <div class="form-field">
@@ -108,6 +114,7 @@ else
     private TimeOnly? _time;
     private string? _title;
     private string? _notes;
+    private string? _location;
     private HashSet<string> _assigned = [];
     private HashSet<string> _contactIds = [];
 
@@ -168,6 +175,7 @@ else
             Time = _time?.ToString("HH:mm"),
             Title = _title!.Trim(),
             Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+            Location = string.IsNullOrWhiteSpace(_location) ? null : _location.Trim(),
             AssignedTo = _assigned.ToList(),
             ContactIds = _contactIds.ToList(),
             Status = "todo"
@@ -194,6 +202,7 @@ else
             _time = null;
             _title = null;
             _notes = null;
+            _location = null;
             _assigned = [];
             _contactIds = [];
         }

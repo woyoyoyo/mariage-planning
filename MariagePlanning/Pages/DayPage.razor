@@ -1,0 +1,245 @@
+@page "/jour/{DateStr}"
+@implements IDisposable
+@inject WeddingStore Store
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Mariage Planning — @(_day?.Label ?? "Jour")</PageTitle>
+
+@if (!_ready)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else if (_day is null)
+{
+    <div class="load-error">
+        <p>⚠️ Jour introuvable.</p>
+        <a class="action-btn btn-refresh" href="">← Retour à l'accueil</a>
+    </div>
+}
+else
+{
+    <div class="day-page-topbar no-print">
+        <a class="day-page-back" href="">← Accueil</a>
+        <button class="btn-share-day" @onclick="ShareAsync" title="Partager ce jour">📤</button>
+    </div>
+
+    <header class="page-header @(IsWeddingDay ? "day-header-wedding" : "")">
+        <h1>@_day.Label</h1>
+        <div class="wedding-sub">@FrenchDate.Long(_day.Date)</div>
+        <div class="day-header-badges">
+            @if (IsWeddingDay) { <span class="badge badge-wedding">✨ Jour J</span> }
+            @if (IsToday) { <span class="badge badge-today">Aujourd'hui</span> }
+            @if (TotalCount > 0)
+            {
+                <span class="badge @(DoneCount == TotalCount ? "badge-done" : "badge-todo")">@DoneCount / @TotalCount</span>
+            }
+        </div>
+    </header>
+
+    @* Tâches sans horaire *@
+    @if (UntimedTasks.Any())
+    {
+        <div class="timeline-allday">
+            <span class="timeline-allday-label">📌 Sans horaire</span>
+            @foreach (var task in UntimedTasks)
+            {
+                <TaskCard Task="task" Date="_day.Date" />
+            }
+        </div>
+    }
+
+    @* Timeline des tâches avec horaire *@
+    @if (TimedGroups.Any())
+    {
+        <div class="timeline">
+            @foreach (var group in TimedGroups)
+            {
+                <div class="timeline-slot">
+                    <div class="timeline-left">
+                        <span class="timeline-time-label">@group.Key</span>
+                        <span class="timeline-dot"></span>
+                    </div>
+                    <div class="timeline-right">
+                        @foreach (var task in group)
+                        {
+                            <TaskCard Task="task" Date="_day.Date" HideTime="true" />
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!_day.Activities.Any())
+    {
+        <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+    }
+
+    <AddTaskForm Date="_day.Date" />
+
+    @if (Store.CanEdit)
+    {
+        <div class="day-page-manage">
+            @if (_editingLabel)
+            {
+                <div class="add-form">
+                    <label class="form-field">
+                        <span class="form-label">Libellé du jour</span>
+                        <input class="form-input" type="text" @bind="_editLabel" autocapitalize="sentences" />
+                    </label>
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _editingLabel = false" disabled="@_manageBusy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="SaveLabelAsync"
+                                disabled="@(_manageBusy || string.IsNullOrWhiteSpace(_editLabel))">
+                            @(_manageBusy ? "⏳…" : "💾 Enregistrer")
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (_confirmingDelete)
+            {
+                <div class="delete-confirm">
+                    <span class="delete-confirm-text">Supprimer « @_day.Label » et toutes ses tâches ?</span>
+                    <div class="delete-confirm-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _confirmingDelete = false" disabled="@_manageBusy">Annuler</button>
+                        <button class="action-btn btn-delete-yes" @onclick="DeleteDayAsync" disabled="@_manageBusy">
+                            @(_manageBusy ? "⏳…" : "🗑️ Supprimer")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="day-manage-actions">
+                    <button class="action-btn btn-clear" @onclick="StartEditLabel">✏️ Renommer ce jour</button>
+                    <button class="action-btn btn-clear" @onclick="() => _confirmingDelete = true">🗑️ Supprimer ce jour</button>
+                </div>
+            }
+            @if (_manageError is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_manageError</div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string DateStr { get; set; } = "";
+
+    private bool _ready;
+    private WeddingDay? _day;
+
+    private bool _editingLabel;
+    private string? _editLabel;
+    private bool _confirmingDelete;
+    private bool _manageBusy;
+    private string? _manageError;
+
+    private bool IsWeddingDay => _day is not null && Store.IsWeddingDay(_day);
+    private bool IsToday => _day?.Date == DateOnly.FromDateTime(DateTime.Now);
+
+    private IEnumerable<TaskItem> UntimedTasks =>
+        _day?.Activities.Where(t => t.Time is null) ?? [];
+
+    private IEnumerable<IGrouping<string, TaskItem>> TimedGroups =>
+        _day?.Activities
+            .Where(t => t.Time is not null)
+            .OrderBy(t => t.Time, StringComparer.Ordinal)
+            .GroupBy(t => t.Time!)
+        ?? Enumerable.Empty<IGrouping<string, TaskItem>>();
+
+    private int TotalCount => _day?.Activities.Count ?? 0;
+    private int DoneCount => _day?.Activities.Count(t => t.IsDone) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnChanged;
+        await Store.EnsureLoadedAsync();
+        ResolveDay();
+        _ready = true;
+    }
+
+    public void Dispose() => Store.Changed -= OnChanged;
+
+    private void OnChanged()
+    {
+        ResolveDay();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ResolveDay()
+    {
+        if (!DateOnly.TryParse(DateStr, out var date)) { _day = null; return; }
+        _day = Store.Data?.Days.FirstOrDefault(d => d.Date == date);
+    }
+
+    private void StartEditLabel()
+    {
+        _editLabel = _day!.Label;
+        _editingLabel = true;
+        _manageError = null;
+    }
+
+    private async Task SaveLabelAsync()
+    {
+        _manageBusy = true;
+        _manageError = null;
+        var date = _day!.Date;
+        var label = _editLabel!.Trim();
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            if (day is null) return false;
+            day.Label = label;
+            return true;
+        });
+
+        _manageBusy = false;
+        if (ok) _editingLabel = false;
+        else _manageError = error;
+    }
+
+    private async Task DeleteDayAsync()
+    {
+        _manageBusy = true;
+        _manageError = null;
+        var date = _day!.Date;
+
+        var (ok, error) = await Store.SaveAsync(data =>
+            data.Days.RemoveAll(d => d.Date == date) > 0);
+
+        _manageBusy = false;
+        if (ok) Nav.NavigateTo(Nav.BaseUri);
+        else { _confirmingDelete = false; _manageError = error; }
+    }
+
+    private async Task ShareAsync()
+    {
+        if (_day is null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"📅 {FrenchDate.Long(_day.Date)} — {_day.Label}");
+        sb.AppendLine();
+        var sorted = _day.Activities
+            .OrderBy(t => t.Time is not null)
+            .ThenBy(t => t.Time, StringComparer.Ordinal);
+        foreach (var t in sorted)
+        {
+            var check = t.IsDone ? "✅" : "⬜";
+            var time = t.Time is not null ? $"{t.Time}  " : "";
+            sb.AppendLine($"{check} {time}{t.Title}");
+            var people = t.AssignedTo.Count == 0
+                ? "Tout le monde"
+                : string.Join(", ", Store.AssignedPeople(t).Select(p => p.Name));
+            sb.AppendLine($"  👤 {people}");
+            if (!string.IsNullOrWhiteSpace(t.Notes)) sb.AppendLine($"  💡 {t.Notes}");
+            if (!string.IsNullOrWhiteSpace(t.Location)) sb.AppendLine($"  📍 {t.Location}");
+        }
+        sb.AppendLine();
+        sb.Append("— Mariage Planning 💍");
+        try { await JS.InvokeVoidAsync("mariage.shareText", sb.ToString().Trim()); }
+        catch { }
+    }
+}
