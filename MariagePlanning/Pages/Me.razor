@@ -1,7 +1,7 @@
 @page "/moi"
+@implements IDisposable
 @inject WeddingStore Store
 @inject SettingsService Config
-@inject NavigationManager Nav
 
 <PageTitle>Mariage Planning — Moi</PageTitle>
 
@@ -9,11 +9,81 @@
 {
     <div class="loading-message">Chargement…</div>
 }
+else if (_person is not null)
+{
+    <header class="page-header dashboard-header" style="--person-color: @_person.Color">
+        <div class="dashboard-avatar">@(_person.Name.Length > 0 ? _person.Name[0].ToString() : "?")</div>
+        <div class="dashboard-header-info">
+            <h1 class="dashboard-name">@_person.Name</h1>
+            <button class="dashboard-change" @onclick="ChangePerson">Changer de personne</button>
+        </div>
+    </header>
+
+    <div class="dashboard-progress">
+        <div class="progress-label">
+            <span>@_myDone / @_myTotal tâches</span>
+            <span class="progress-pct">@_myPct %</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: @(_myPct)%"></div>
+        </div>
+    </div>
+
+    @foreach (var day in Store.Data!.Days)
+    {
+        var myTasks = day.Activities
+            .Where(t => WeddingStore.ConcernsPerson(t, _person.Id))
+            .OrderBy(t => t.Time ?? "99:99")
+            .ToList();
+
+        if (myTasks.Count == 0) continue;
+
+        var dayDate = day.Date;
+
+        <div class="dashboard-day">
+            <h2 class="dashboard-day-title">
+                @day.Label — @day.Date.ToString("d MMM", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))
+            </h2>
+            @foreach (var task in myTasks)
+            {
+                var tid = task.Id;
+                <button class="dashboard-task @(task.IsDone ? "dt-done" : "")"
+                        @onclick="() => ToggleTaskAsync(dayDate, tid)"
+                        disabled="@(!Store.CanEdit)">
+                    <span class="dt-check">@(task.IsDone ? "✅" : "⬜")</span>
+                    <span class="dt-body">
+                        <span class="dt-title">@task.Title</span>
+                        @if (task.Time is not null)
+                        {
+                            <span class="dt-meta">@task.Time</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(task.Notes))
+                        {
+                            <span class="dt-notes">@task.Notes</span>
+                        }
+                    </span>
+                </button>
+            }
+        </div>
+    }
+
+    @if (_myTotal == 0)
+    {
+        <div class="empty-message">Aucune tâche assignée à @_person.Name pour l'instant.</div>
+    }
+
+    @if (Store.CanEdit)
+    {
+        <div class="dashboard-fab">
+            <a class="action-btn btn-add fab-add" href="">➕ Ajouter une tâche</a>
+        </div>
+    }
+}
 else
 {
     <header class="page-header">
         <h1>👤 Qui es-tu ?</h1>
-        <div class="wedding-sub">Ton choix est mémorisé sur ce téléphone — l'onglet Moi affichera ton planning.</div>
+        <div class="wedding-sub">Ton choix est mémorisé sur ce téléphone.</div>
     </header>
 
     <div class="person-picker">
@@ -25,29 +95,138 @@ else
             </button>
         }
     </div>
+
+    @if (Store.CanEdit)
+    {
+        @if (_addingPerson)
+        {
+            <div class="add-form" style="margin-top: 1rem">
+                <div class="add-form-row">
+                    <label class="form-field form-grow">
+                        <span class="form-label">Prénom *</span>
+                        <input class="form-input" type="text" @bind="_newName"
+                               autocapitalize="words" autocorrect="off" />
+                    </label>
+                    <label class="form-field">
+                        <span class="form-label">Couleur</span>
+                        <input type="color" class="color-picker" @bind="_newColor" />
+                    </label>
+                </div>
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="() => _addingPerson = false">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="AddPersonAsync"
+                            disabled="@(_addBusy || string.IsNullOrWhiteSpace(_newName))">
+                        @(_addBusy ? "⏳…" : "➕ Ajouter")
+                    </button>
+                </div>
+                @if (_addError is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_addError</div>
+                }
+            </div>
+        }
+        else
+        {
+            <button class="action-btn btn-add" style="margin-top: 1rem"
+                    @onclick="() => _addingPerson = true">
+                ➕ Ajouter une personne
+            </button>
+        }
+    }
 }
 
 @code {
     private bool _ready;
+    private Person? _person;
+    private int _myTotal;
+    private int _myDone;
+    private int _myPct;
+
+    private bool _addingPerson;
+    private string? _newName;
+    private string _newColor = "#6366f1";
+    private bool _addBusy;
+    private string? _addError;
 
     protected override async Task OnInitializedAsync()
     {
+        Store.Changed += OnChanged;
         await Config.EnsureLoadedAsync();
         await Store.EnsureLoadedAsync();
+        ResolvePerson();
+        _ready = true;
+    }
 
-        // Personne déjà choisie (et toujours existante) : direction son planning.
-        if (Config.CurrentPerson is { } id && Store.PersonById(id) is not null)
+    public void Dispose() => Store.Changed -= OnChanged;
+
+    private void OnChanged()
+    {
+        ResolvePerson();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ResolvePerson()
+    {
+        _person = Config.CurrentPerson is { } id ? Store.PersonById(id) : null;
+        RecomputeStats();
+    }
+
+    private void RecomputeStats()
+    {
+        if (_person is null || Store.Data is null)
         {
-            Nav.NavigateTo($"personne/{id}", replace: true);
+            _myTotal = _myDone = _myPct = 0;
             return;
         }
-
-        _ready = true;
+        _myTotal = Store.Data.Days.Sum(d =>
+            d.Activities.Count(t => WeddingStore.ConcernsPerson(t, _person.Id)));
+        _myDone = Store.Data.Days.Sum(d =>
+            d.Activities.Count(t => WeddingStore.ConcernsPerson(t, _person.Id) && t.IsDone));
+        _myPct = _myTotal == 0 ? 0 : (int)(_myDone * 100.0 / _myTotal);
     }
 
     private async Task PickAsync(string personId)
     {
         await Config.SetCurrentPersonAsync(personId);
-        Nav.NavigateTo($"personne/{personId}");
+        ResolvePerson();
+    }
+
+    private async Task ChangePerson()
+    {
+        await Config.SetCurrentPersonAsync(null);
+        _person = null;
+        RecomputeStats();
+    }
+
+    private async Task ToggleTaskAsync(DateOnly date, string taskId)
+    {
+        await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            var task = day?.Activities.FirstOrDefault(t => t.Id == taskId);
+            if (task is null) return false;
+            task.Status = task.IsDone ? "todo" : "done";
+            return true;
+        });
+    }
+
+    private async Task AddPersonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        _addBusy = true;
+        _addError = null;
+        var name = _newName.Trim();
+        var color = _newColor;
+        var id = Guid.NewGuid().ToString("N")[..8];
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.People.Add(new Person { Id = id, Name = name, Color = color });
+            return true;
+        });
+
+        _addBusy = false;
+        if (ok) { _addingPerson = false; _newName = null; _newColor = "#6366f1"; }
+        else _addError = error;
     }
 }

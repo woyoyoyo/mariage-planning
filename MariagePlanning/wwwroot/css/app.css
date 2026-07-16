@@ -172,6 +172,11 @@ html, body {
     color: #5b21b6;
 }
 
+.sync-readonly {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
 .sync-demo {
     background: var(--color-accent-soft);
     color: var(--color-accent);
@@ -1170,6 +1175,232 @@ select.form-input {
 /* --------------------------------------------------------------------------
    Export PDF — impression
    -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   Paramètres — section config repliable
+   -------------------------------------------------------------------------- */
+
+.config-section {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.config-section-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    color: var(--color-text-soft);
+}
+
+.config-section-summary::-webkit-details-marker { display: none; }
+
+.config-section[open] .config-section-summary {
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.config-section-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   Onglet Moi — Dashboard personnel
+   -------------------------------------------------------------------------- */
+
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--header-grad);
+    border-radius: var(--radius);
+    margin-bottom: 0;
+}
+
+.dashboard-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--person-color, #9d174d);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.4);
+}
+
+.dashboard-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dashboard-name {
+    margin: 0;
+    font-size: 22px;
+    color: #fff;
+    font-weight: 700;
+}
+
+.dashboard-change {
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.dashboard-change:active {
+    background: rgba(255,255,255,0.32);
+}
+
+.dashboard-progress {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-soft);
+}
+
+.progress-pct {
+    color: var(--color-primary);
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 8px;
+    transition: width 0.4s ease;
+    min-width: 4px;
+}
+
+.dashboard-day {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.dashboard-day-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-soft);
+    padding: 10px 14px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.dashboard-task {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: 15px;
+    transition: background 0.12s;
+}
+
+.dashboard-task:last-child {
+    border-bottom: none;
+}
+
+.dashboard-task:active:not(:disabled) {
+    background: var(--color-primary-soft);
+}
+
+.dashboard-task:disabled {
+    cursor: default;
+}
+
+.dashboard-task.dt-done .dt-title {
+    text-decoration: line-through;
+    color: var(--color-text-soft);
+    opacity: 0.7;
+}
+
+.dt-check {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.dt-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.dt-title {
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.3;
+}
+
+.dt-meta {
+    font-size: 12px;
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.dt-notes {
+    font-size: 12px;
+    color: var(--color-text-soft);
+    font-style: italic;
+}
+
+.dashboard-fab {
+    padding: 4px 0 8px;
+}
+
+.fab-add {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+}
 
 @media print {
     /* Éléments interactifs masqués */

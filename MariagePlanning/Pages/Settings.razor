@@ -11,31 +11,45 @@
 </header>
 
 <div class="settings-form">
-    <label class="form-field">
-        <span class="form-label">ID du Gist</span>
-        <input class="form-input" type="text" @bind="_gistId"
-               placeholder="ex : bd451c30da0d..." autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <span class="form-hint">La chaîne dans l'URL du Gist (gist.github.com/toncompte/<b>ID</b>). Suffit pour lire le planning.</span>
-    </label>
 
-    <label class="form-field">
-        <span class="form-label">Token GitHub (PAT)</span>
-        <input class="form-input" type="@(_showToken ? "text" : "password")" @bind="_token"
-               placeholder="ghp_..." autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <span class="form-hint">Nécessaire uniquement pour modifier le planning. Stocké sur ce téléphone, nulle part ailleurs.</span>
-    </label>
-
-    <label class="show-token">
-        <input type="checkbox" @bind="_showToken" /> Afficher le token
-    </label>
-
-    <button class="action-btn btn-refresh" @onclick="SaveAsync" disabled="@_busy">
-        @(_busy ? "⏳ Vérification…" : "💾 Enregistrer et tester")
-    </button>
+    @if (Config.CanSave)
+    {
+        <div class="sync-status sync-ok">✅ Connecté — modification active sur ce téléphone.</div>
+    }
+    else if (Config.IsConfigured)
+    {
+        <div class="sync-status sync-readonly">👁️ Lecture seule — entre le mot de passe pour modifier.</div>
+    }
+    else
+    {
+        <div class="sync-status sync-demo">💡 Scanne le QR code des organisateurs, ou configure l'accès ci-dessous.</div>
+    }
 
     @if (_feedback is not null)
     {
         <div class="sync-status @_feedbackClass">@_feedback</div>
+    }
+
+    @if (!Config.CanSave && Config.LockedToken is not null)
+    {
+        <div class="share-config">
+            <h2 class="share-config-title">🔓 Déverrouiller la modification</h2>
+            <p class="form-hint">Entre le mot de passe du groupe pour pouvoir modifier le planning.</p>
+            <label class="form-field">
+                <span class="form-label">Mot de passe du groupe</span>
+                <input class="form-input" type="password" @bind="_unlockPassword" @bind:event="oninput"
+                       placeholder="Mot de passe reçu avec le QR code"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" />
+            </label>
+            <button class="action-btn btn-refresh" @onclick="UnlockAsync"
+                    disabled="@(_unlockBusy || string.IsNullOrWhiteSpace(_unlockPassword))">
+                @(_unlockBusy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
+            </button>
+            @if (_unlockError is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_unlockError</div>
+            }
+        </div>
     }
 
     @if (Store.Data?.People.Count > 0)
@@ -278,33 +292,6 @@
         </div>
     }
 
-    @if (!Config.CanSave && Config.LockedToken is not null)
-    {
-        <div class="share-config">
-            <h2 class="share-config-title">🔓 Déverrouiller la modification</h2>
-            <p class="form-hint">
-                Tu as reçu ce planning en lecture. Si tu fais partie des organisateurs,
-                entre le mot de passe du groupe pour pouvoir le modifier.
-            </p>
-
-            <label class="form-field">
-                <span class="form-label">Mot de passe du groupe</span>
-                <input class="form-input" type="password" @bind="_unlockPassword" @bind:event="oninput"
-                       autocapitalize="off" autocorrect="off" spellcheck="false" />
-            </label>
-
-            <button class="action-btn btn-refresh" @onclick="UnlockAsync"
-                    disabled="@(_unlockBusy || string.IsNullOrWhiteSpace(_unlockPassword))">
-                @(_unlockBusy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
-            </button>
-
-            @if (_unlockError is not null)
-            {
-                <div class="sync-status sync-warn">⚠️ @_unlockError</div>
-            }
-        </div>
-    }
-
     @if (Config.IsConfigured)
     {
         <div class="share-config">
@@ -368,6 +355,30 @@
             }
         </div>
     }
+
+    <details class="config-section" open="@(!Config.IsConfigured)">
+        <summary class="config-section-summary">🔧 Configuration de l'accès</summary>
+        <div class="config-section-body">
+            <label class="form-field">
+                <span class="form-label">ID du Gist</span>
+                <input class="form-input" type="text" @bind="_gistId"
+                       placeholder="ex : bd451c30da0d..." autocapitalize="off" autocorrect="off" spellcheck="false" />
+                <span class="form-hint">La chaîne dans l'URL du Gist (gist.github.com/toncompte/<b>ID</b>). Suffit pour lire le planning.</span>
+            </label>
+            <label class="form-field">
+                <span class="form-label">Token GitHub (PAT)</span>
+                <input class="form-input" type="@(_showToken ? "text" : "password")" @bind="_token"
+                       placeholder="ghp_..." autocapitalize="off" autocorrect="off" spellcheck="false" />
+                <span class="form-hint">Nécessaire uniquement pour modifier le planning. Stocké sur ce téléphone, nulle part ailleurs.</span>
+            </label>
+            <label class="show-token">
+                <input type="checkbox" @bind="_showToken" /> Afficher le token
+            </label>
+            <button class="action-btn btn-refresh" @onclick="SaveAsync" disabled="@_busy">
+                @(_busy ? "⏳ Vérification…" : "💾 Enregistrer et tester")
+            </button>
+        </div>
+    </details>
 
     <div class="actions-footer">
         @if (Config.CanSave)
@@ -732,10 +743,10 @@
     {
         _token = null;
         await Config.SaveAsync(Config.GistId, null);
-        await Config.SetLockedTokenAsync(null);
+        // Do NOT clear LockedToken — user can re-enter password without rescanning QR
         await Store.ReloadAsync();
-        _feedback = "🔒 Déconnecté — planning en lecture seule.";
-        _feedbackClass = "sync-demo";
+        _feedback = "🔒 Déconnecté — entre le mot de passe pour réactiver la modification.";
+        _feedbackClass = "sync-readonly";
     }
 
     private async Task ClearAsync()
