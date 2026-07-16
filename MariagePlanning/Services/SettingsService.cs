@@ -10,12 +10,16 @@ public class SettingsService(LocalStorageService storage)
     private const string GistIdKey = "mp.gistId";
     private const string TokenKey = "mp.token";
     private const string CurrentPersonKey = "mp.currentPerson";
+    private const string LockedTokenKey = "mp.lockedToken";
 
     private bool _loaded;
 
     public string? GistId { get; private set; }
     public string? Token { get; private set; }
     public string? CurrentPerson { get; private set; }
+
+    /// <summary>Token chiffré reçu via un lien de partage — déverrouillable plus tard avec le mot de passe.</summary>
+    public string? LockedToken { get; private set; }
 
     /// <summary>Le token n'est pas requis pour lire, seulement pour sauvegarder.</summary>
     public bool IsConfigured => !string.IsNullOrWhiteSpace(GistId);
@@ -28,6 +32,7 @@ public class SettingsService(LocalStorageService storage)
         GistId = await storage.GetAsync(GistIdKey);
         Token = await storage.GetAsync(TokenKey);
         CurrentPerson = await storage.GetAsync(CurrentPersonKey);
+        LockedToken = await storage.GetAsync(LockedTokenKey);
         _loaded = true;
     }
 
@@ -47,6 +52,16 @@ public class SettingsService(LocalStorageService storage)
             await storage.SetAsync(TokenKey, Token);
 
         _loaded = true;
+    }
+
+    public async Task SetLockedTokenAsync(string? blob)
+    {
+        LockedToken = string.IsNullOrWhiteSpace(blob) ? null : blob;
+
+        if (LockedToken is null)
+            await storage.RemoveAsync(LockedTokenKey);
+        else
+            await storage.SetAsync(LockedTokenKey, LockedToken);
     }
 
     public async Task SetCurrentPersonAsync(string? personId)

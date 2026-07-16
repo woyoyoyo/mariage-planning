@@ -8,66 +8,101 @@
 
 <header class="page-header">
     <h1>🔑 Rejoindre le planning</h1>
-    <div class="wedding-sub">Entre le mot de passe du groupe pour configurer l'app.</div>
+    <div class="wedding-sub">Le planning se configure automatiquement en lecture.</div>
 </header>
 
-@if (_blob is null)
+@if (_invalid)
 {
     <div class="load-error">
-        <p>⚠️ Ce lien est incomplet — il manque la configuration chiffrée.</p>
+        <p>⚠️ Ce lien est incomplet — il manque la configuration.</p>
         <p class="error-detail">Demande un nouveau lien (ou re-scanne le QR code) à la personne qui gère le planning.</p>
         <a class="action-btn btn-refresh" href="">Retour au planning</a>
     </div>
 }
-else if (_done)
+else if (!_ready)
 {
-    <div class="settings-form">
-        <div class="sync-status sync-ok">✅ Configuration installée — @( _dayCount ) jour(s) chargé(s).</div>
-        <a class="action-btn btn-refresh" href="moi">👤 Choisir qui je suis</a>
-        <a class="action-btn btn-clear" href="">📋 Voir tout le planning</a>
-    </div>
+    <div class="loading-message">Configuration en cours…</div>
 }
 else
 {
     <div class="settings-form">
-        <label class="form-field">
-            <span class="form-label">Mot de passe</span>
-            <input class="form-input" type="password" @bind="_password" @bind:event="oninput"
-                   placeholder="Le mot de passe partagé du groupe"
-                   autocapitalize="off" autocorrect="off" spellcheck="false" />
-        </label>
-
-        <button class="action-btn btn-refresh" @onclick="UnlockAsync"
-                disabled="@(_busy || string.IsNullOrWhiteSpace(_password))">
-            @(_busy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
-        </button>
-
-        @if (_error is not null)
+        @if (_loadOk)
         {
-            <div class="sync-status sync-warn">⚠️ @_error</div>
+            <div class="sync-status sync-ok">✅ Planning chargé — @_dayCount jour(s), en lecture.</div>
         }
+        else
+        {
+            <div class="sync-status sync-warn">⚠️ Configuration installée mais chargement impossible : @(Store.LoadError ?? "vérifie le réseau"). Réessaie depuis le planning.</div>
+        }
+
+        @if (_unlocked)
+        {
+            <div class="sync-status sync-ok">✏️ Modification déverrouillée sur ce téléphone.</div>
+        }
+        else if (_blob is not null)
+        {
+            <label class="form-field">
+                <span class="form-label">Tu fais partie des organisateurs ?</span>
+                <input class="form-input" type="password" @bind="_password" @bind:event="oninput"
+                       placeholder="Mot de passe du groupe"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" />
+                <span class="form-hint">Le mot de passe déverrouille la modification du planning. Sans lui, tu peux tout consulter mais rien changer — et tu pourras le saisir plus tard dans Paramètres.</span>
+            </label>
+
+            <button class="action-btn btn-refresh" @onclick="UnlockAsync"
+                    disabled="@(_busy || string.IsNullOrWhiteSpace(_password))">
+                @(_busy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller la modification")
+            </button>
+
+            @if (_error is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_error</div>
+            }
+        }
+
+        <a class="action-btn btn-refresh" href="moi">👤 Choisir qui je suis</a>
+        <a class="action-btn btn-clear" href="">📋 Voir tout le planning</a>
     </div>
 }
 
 @code {
     private string? _blob;
     private string? _password;
+    private bool _invalid;
+    private bool _ready;
+    private bool _loadOk;
+    private bool _unlocked;
     private bool _busy;
-    private bool _done;
     private string? _error;
     private int _dayCount;
 
-    private class SharedConfig
+    protected override async Task OnInitializedAsync()
     {
-        public string? GistId { get; set; }
-        public string? Token { get; set; }
-    }
+        // Format du fragment : #<gistId> ou #<gistId>.<token chiffré>.
+        // Il voyage dans le fragment (#...) : jamais envoyé au serveur.
+        var fragment = new Uri(Nav.Uri).Fragment;
+        var payload = fragment.Length > 1 ? fragment[1..] : "";
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            _invalid = true;
+            return;
+        }
 
-    protected override void OnInitialized()
-    {
-        // La config chiffrée voyage dans le fragment (#...) : jamais envoyée au serveur.
-        var uri = new Uri(Nav.Uri);
-        _blob = uri.Fragment.Length > 1 ? uri.Fragment[1..] : null;
+        var dot = payload.IndexOf('.');
+        var gistId = dot < 0 ? payload : payload[..dot];
+        _blob = dot < 0 ? null : payload[(dot + 1)..];
+
+        await Config.EnsureLoadedAsync();
+
+        // Lecture immédiate : on installe le Gist, en gardant un éventuel token déjà présent.
+        await Config.SaveAsync(gistId, Config.Token);
+        await Config.SetLockedTokenAsync(_blob);
+        await Store.ReloadAsync();
+
+        _loadOk = Store.Source == DataSource.Gist;
+        _dayCount = Store.Data?.Days.Count ?? 0;
+        _unlocked = Config.CanSave;
+        _ready = true;
     }
 
     private async Task UnlockAsync()
@@ -77,31 +112,13 @@ else
 
         try
         {
-            var json = await JS.InvokeAsync<string>("mariage.decryptConfig", _password, _blob);
-            var config = JsonSerializer.Deserialize<SharedConfig>(json, GistService.JsonOpts);
-
-            if (string.IsNullOrWhiteSpace(config?.GistId))
-            {
-                _error = "Lien invalide — la configuration déchiffrée est vide.";
-                return;
-            }
-
-            await Config.SaveAsync(config.GistId, config.Token);
-            await Store.ReloadAsync();
-
-            if (Store.Source == DataSource.Gist)
-            {
-                _dayCount = Store.Data?.Days.Count ?? 0;
-                _done = true;
-            }
-            else
-            {
-                _error = $"Configuration installée mais connexion impossible : {Store.LoadError ?? "vérifie le réseau"}";
-            }
+            var token = await JS.InvokeAsync<string>("mariage.decryptConfig", _password, _blob);
+            await Config.SaveAsync(Config.GistId, token);
+            _unlocked = true;
         }
         catch (JSException)
         {
-            _error = "Mot de passe incorrect (ou lien abîmé) — réessaie.";
+            _error = "Mot de passe incorrect — réessaie.";
         }
         catch (Exception ex)
         {

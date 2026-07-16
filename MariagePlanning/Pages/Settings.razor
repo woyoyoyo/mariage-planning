@@ -52,13 +52,41 @@
         </div>
     }
 
+    @if (!Config.CanSave && Config.LockedToken is not null)
+    {
+        <div class="share-config">
+            <h2 class="share-config-title">🔓 Déverrouiller la modification</h2>
+            <p class="form-hint">
+                Tu as reçu ce planning en lecture. Si tu fais partie des organisateurs,
+                entre le mot de passe du groupe pour pouvoir le modifier.
+            </p>
+
+            <label class="form-field">
+                <span class="form-label">Mot de passe du groupe</span>
+                <input class="form-input" type="password" @bind="_unlockPassword" @bind:event="oninput"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" />
+            </label>
+
+            <button class="action-btn btn-refresh" @onclick="UnlockAsync"
+                    disabled="@(_unlockBusy || string.IsNullOrWhiteSpace(_unlockPassword))">
+                @(_unlockBusy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
+            </button>
+
+            @if (_unlockError is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_unlockError</div>
+            }
+        </div>
+    }
+
     @if (Config.CanSave)
     {
         <div class="share-config">
             <h2 class="share-config-title">📲 Partager la configuration</h2>
             <p class="form-hint">
-                Génère un lien (et son QR code) contenant le Gist + le token, chiffrés avec un
-                mot de passe. La personne qui l'ouvre entre le mot de passe et l'app se configure toute seule.
+                Génère un lien (et son QR code) à partager. Celui qui le scanne voit le planning
+                en <b>lecture</b> ; ceux qui ont le mot de passe peuvent déverrouiller la <b>modification</b>
+                (le token est chiffré avec ce mot de passe dans le lien).
             </p>
 
             <label class="form-field">
@@ -154,12 +182,11 @@
         _shareBusy = true;
         _shareCopied = false;
 
-        var payload = JsonSerializer.Serialize(
-            new { gistId = Config.GistId, token = Config.Token }, GistService.JsonOpts);
-        var blob = await JS.InvokeAsync<string>("mariage.encryptConfig", _sharePassword, payload);
-
-        // Le blob voyage dans le fragment (#...) : il n'atteint jamais le serveur.
-        _shareUrl = $"{Nav.BaseUri}rejoindre#{blob}";
+        // Format : #<gistId>.<token chiffré> — l'ID en clair donne la lecture,
+        // le mot de passe déverrouille le token (donc la modification).
+        // Le tout voyage dans le fragment (#...) : il n'atteint jamais le serveur.
+        var blob = await JS.InvokeAsync<string>("mariage.encryptConfig", _sharePassword, Config.Token);
+        _shareUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}.{blob}";
         _shareBusy = false;
 
         StateHasChanged();
@@ -182,12 +209,46 @@
         catch { /* share non supporté ou annulé */ }
     }
 
+    // --- Déverrouillage de la modification (token chiffré reçu via un lien) ---
+
+    private string? _unlockPassword;
+    private bool _unlockBusy;
+    private string? _unlockError;
+
+    private async Task UnlockAsync()
+    {
+        _unlockBusy = true;
+        _unlockError = null;
+
+        try
+        {
+            var token = await JS.InvokeAsync<string>("mariage.decryptConfig", _unlockPassword, Config.LockedToken);
+            await Config.SaveAsync(Config.GistId, token);
+            _token = token;
+            _feedback = "✏️ Modification déverrouillée sur ce téléphone.";
+            _feedbackClass = "sync-ok";
+        }
+        catch (JSException)
+        {
+            _unlockError = "Mot de passe incorrect — réessaie.";
+        }
+        catch (Exception ex)
+        {
+            _unlockError = ex.Message;
+        }
+        finally
+        {
+            _unlockBusy = false;
+        }
+    }
+
     private async Task ClearAsync()
     {
         _gistId = null;
         _token = null;
         await Config.SaveAsync(null, null);
         await Config.SetCurrentPersonAsync(null);
+        await Config.SetLockedTokenAsync(null);
         await Store.ReloadAsync();
         _feedback = "🗑️ Configuration effacée — retour aux données de démo.";
         _feedbackClass = "sync-demo";
