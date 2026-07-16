@@ -52,6 +52,63 @@
         </div>
     }
 
+    @if (Config.CanSave && Store.Data is not null)
+    {
+        <div class="share-config">
+            <h2 class="share-config-title">👥 Personnes</h2>
+
+            <div class="people-list">
+                @foreach (var person in Store.Data.People)
+                {
+                    var pid = person.Id;
+                    <div class="people-row">
+                        <span class="person-badge" style="--person-color: @person.Color">@person.Name</span>
+                        <button class="btn-card-icon people-delete"
+                                @onclick="() => DeletePersonAsync(pid)"
+                                disabled="@_personBusy"
+                                title="Supprimer @person.Name">🗑️</button>
+                    </div>
+                }
+            </div>
+
+            @if (_addingPerson)
+            {
+                <div class="add-form">
+                    <div class="add-form-row">
+                        <label class="form-field form-grow">
+                            <span class="form-label">Prénom *</span>
+                            <input class="form-input" type="text" @bind="_newPersonName"
+                                   placeholder="ex : Marie"
+                                   autocapitalize="words" autocorrect="off" />
+                        </label>
+                        <label class="form-field">
+                            <span class="form-label">Couleur</span>
+                            <input type="color" class="color-picker" @bind="_newPersonColor" />
+                        </label>
+                    </div>
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _addingPerson = false">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="AddPersonAsync"
+                                disabled="@(_personBusy || string.IsNullOrWhiteSpace(_newPersonName))">
+                            @(_personBusy ? "⏳…" : "➕ Ajouter")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button class="action-btn btn-add" @onclick="() => _addingPerson = true">
+                    ➕ Ajouter une personne
+                </button>
+            }
+
+            @if (_personError is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_personError</div>
+            }
+        </div>
+    }
+
     @if (!Config.CanSave && Config.LockedToken is not null)
     {
         <div class="share-config">
@@ -169,6 +226,63 @@
 
     private async Task OnPersonChangedAsync(ChangeEventArgs e) =>
         await Config.SetCurrentPersonAsync(e.Value?.ToString());
+
+    // --- Gestion des personnes ---
+
+    private bool _addingPerson;
+    private string? _newPersonName;
+    private string _newPersonColor = "#6366f1";
+    private bool _personBusy;
+    private string? _personError;
+
+    private async Task AddPersonAsync()
+    {
+        _personBusy = true;
+        _personError = null;
+        var name = _newPersonName!.Trim();
+        var color = _newPersonColor;
+        var id = Guid.NewGuid().ToString("N")[..8];
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.People.Add(new Person { Id = id, Name = name, Color = color });
+            return true;
+        });
+
+        _personBusy = false;
+        if (ok)
+        {
+            _newPersonName = null;
+            _newPersonColor = "#6366f1";
+            _addingPerson = false;
+        }
+        else
+        {
+            _personError = error;
+        }
+    }
+
+    private async Task DeletePersonAsync(string personId)
+    {
+        _personBusy = true;
+        _personError = null;
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.People.RemoveAll(p => p.Id == personId);
+            foreach (var day in data.Days)
+                foreach (var task in day.Activities)
+                    task.AssignedTo.Remove(personId);
+            return true;
+        });
+
+        if (ok && Config.CurrentPerson == personId)
+            await Config.SetCurrentPersonAsync(null);
+
+        _personBusy = false;
+        if (!ok)
+            _personError = error;
+    }
 
     // --- Partage de la configuration (URL chiffrée + QR code) ---
 

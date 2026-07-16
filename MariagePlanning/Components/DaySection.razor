@@ -30,12 +30,39 @@
     </summary>
 
     <div class="day-body">
-        @foreach (var task in SortedTasks)
+        @if (UntimedTasks.Any())
         {
-            <TaskCard Task="task" Date="Day.Date" />
+            <div class="timeline-allday">
+                <span class="timeline-allday-label">📌 Sans horaire</span>
+                @foreach (var task in UntimedTasks)
+                {
+                    <TaskCard Task="task" Date="Day.Date" />
+                }
+            </div>
         }
 
-        @if (Day.Activities.Count == 0)
+        @if (TimedGroups.Any())
+        {
+            <div class="timeline">
+                @foreach (var group in TimedGroups)
+                {
+                    <div class="timeline-slot">
+                        <div class="timeline-left">
+                            <span class="timeline-time-label">@group.Key</span>
+                            <span class="timeline-dot"></span>
+                        </div>
+                        <div class="timeline-right">
+                            @foreach (var task in group)
+                            {
+                                <TaskCard Task="task" Date="Day.Date" HideTime="true" />
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!FilteredTasks.Any())
         {
             <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
         }
@@ -63,10 +90,14 @@
             ? Day.Activities
             : Day.Activities.Where(t => WeddingStore.ConcernsPerson(t, PersonId));
 
-    private IEnumerable<TaskItem> SortedTasks =>
+    private IEnumerable<TaskItem> UntimedTasks =>
+        FilteredTasks.Where(t => t.Time is null);
+
+    private IEnumerable<IGrouping<string, TaskItem>> TimedGroups =>
         FilteredTasks
-            .OrderBy(t => t.Time is not null)
-            .ThenBy(t => t.Time, StringComparer.Ordinal);
+            .Where(t => t.Time is not null)
+            .OrderBy(t => t.Time, StringComparer.Ordinal)
+            .GroupBy(t => t.Time!);
 
     private int TodoCount => FilteredTasks.Count(t => !t.IsDone);
     private int DoneCount => FilteredTasks.Count(t => t.IsDone);
@@ -87,7 +118,10 @@
         sb.AppendLine($"📅 {FrenchDate.Long(Day.Date)} — {Day.Label}");
         sb.AppendLine();
 
-        foreach (var t in SortedTasks)
+        var sorted = FilteredTasks
+            .OrderBy(t => t.Time is not null)
+            .ThenBy(t => t.Time, StringComparer.Ordinal);
+        foreach (var t in sorted)
         {
             var check = t.IsDone ? "✅" : "⬜";
             var time = t.Time is not null ? $"{t.Time}  " : "";

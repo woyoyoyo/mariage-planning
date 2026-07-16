@@ -54,7 +54,7 @@ else
     <div class="task-card @(Task.IsDone ? "is-done" : "")" @onclick="ToggleDoneAsync">
         <div class="task-head">
             <span class="task-check">@(Task.IsDone ? "✅" : "⬜")</span>
-            @if (Task.Time is not null)
+            @if (Task.Time is not null && !HideTime)
             {
                 <span class="task-time">@Task.Time</span>
             }
@@ -115,6 +115,9 @@ else
 
     [Parameter, EditorRequired]
     public DateOnly Date { get; set; }
+
+    [Parameter]
+    public bool HideTime { get; set; }
 
     // --- état global ---
     private bool _confirming;
