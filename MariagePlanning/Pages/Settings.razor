@@ -136,6 +136,33 @@
         </div>
     }
 
+    @if (Config.IsConfigured)
+    {
+        <div class="share-config">
+            <h2 class="share-config-title">📷 Partager en lecture</h2>
+            <p class="form-hint">
+                Ce QR code donne accès au planning en lecture seule — aucun mot de passe requis.
+            </p>
+            <button class="action-btn btn-refresh" @onclick="GenerateReadonlyShareAsync"
+                    disabled="@_readonlyBusy">
+                @(_readonlyBusy ? "⏳…" : "📷 Générer le QR code lecture")
+            </button>
+            @if (_readonlyUrl is not null)
+            {
+                <div id="readonly-qr" class="share-qr"></div>
+                <div class="share-url">@_readonlyUrl</div>
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CopyReadonlyUrlAsync">📋 Copier</button>
+                    <button class="action-btn btn-refresh" @onclick="ShareReadonlyUrlAsync">📤 Partager</button>
+                </div>
+                @if (_readonlyCopied)
+                {
+                    <div class="sync-status sync-ok">✅ Lien copié.</div>
+                }
+            }
+        </div>
+    }
+
     @if (Config.CanSave)
     {
         <div class="share-config">
@@ -173,9 +200,17 @@
         </div>
     }
 
-    <button class="action-btn btn-clear" @onclick="ClearAsync" disabled="@_busy">
-        🗑️ Effacer la configuration
-    </button>
+    <div class="actions-footer">
+        @if (Config.CanSave)
+        {
+            <button class="action-btn btn-disconnect" @onclick="DisconnectAsync" disabled="@_busy">
+                🔒 Se déconnecter
+            </button>
+        }
+        <button class="action-btn btn-clear" @onclick="ClearAsync" disabled="@_busy">
+            🗑️ Effacer tout
+        </button>
+    </div>
 
     <p class="app-version">Mariage Planning — v@(AppInfo.Version)</p>
 </div>
@@ -284,6 +319,36 @@
             _personError = error;
     }
 
+    // --- Partage en lecture seule (gistId en clair) ---
+
+    private string? _readonlyUrl;
+    private bool _readonlyBusy;
+    private bool _readonlyCopied;
+
+    private async Task GenerateReadonlyShareAsync()
+    {
+        _readonlyBusy = true;
+        _readonlyCopied = false;
+        _readonlyUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}";
+        _readonlyBusy = false;
+
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("mariage.makeQr", "readonly-qr", _readonlyUrl);
+    }
+
+    private async Task CopyReadonlyUrlAsync()
+    {
+        await JS.InvokeVoidAsync("mariage.copyText", _readonlyUrl);
+        _readonlyCopied = true;
+    }
+
+    private async Task ShareReadonlyUrlAsync()
+    {
+        try { await JS.InvokeVoidAsync("mariage.shareText", _readonlyUrl); }
+        catch { }
+    }
+
     // --- Partage de la configuration (URL chiffrée + QR code) ---
 
     private string? _sharePassword;
@@ -354,6 +419,16 @@
         {
             _unlockBusy = false;
         }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        _token = null;
+        await Config.SaveAsync(Config.GistId, null);
+        await Config.SetLockedTokenAsync(null);
+        await Store.ReloadAsync();
+        _feedback = "🔒 Déconnecté — planning en lecture seule.";
+        _feedbackClass = "sync-demo";
     }
 
     private async Task ClearAsync()
