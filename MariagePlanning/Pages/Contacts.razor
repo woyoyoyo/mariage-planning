@@ -1,0 +1,320 @@
+@page "/contacts"
+@implements IDisposable
+@inject WeddingStore Store
+
+<PageTitle>Mariage Planning — Contacts</PageTitle>
+
+<header class="page-header">
+    <h1>📇 Contacts</h1>
+    <div class="wedding-sub">Prestataires, lieux &amp; personnes à contacter</div>
+</header>
+
+@if (Store.Data is null)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else
+{
+    @foreach (var contact in Store.Data.Contacts)
+    {
+        var cid = contact.Id;
+        @if (_editingId == cid)
+        {
+            <div class="add-form edit-form contact-form">
+                @ContactFields()
+                @if (_error is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_error</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                        @(_busy ? "⏳…" : "💾 Enregistrer")
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="contact-card">
+                <div class="contact-card-head">
+                    <span class="contact-name">@contact.Name</span>
+                    @if (Store.CanEdit)
+                    {
+                        <div class="people-row-actions">
+                            <button class="btn-card-icon" @onclick="() => StartEdit(contact)" title="Modifier">✏️</button>
+                            <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(cid)" title="Supprimer">🗑️</button>
+                        </div>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(contact.ContactPerson))
+                {
+                    <div class="contact-detail">👤 @contact.ContactPerson</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(contact.Phone))
+                {
+                    <a href="tel:@contact.Phone" class="contact-action">📞 @contact.Phone</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(contact.Address))
+                {
+                    <a href="@MapsUrl(contact.Address)" target="_blank" rel="noopener" class="contact-action">
+                        📍 @contact.Address
+                    </a>
+                }
+                @if (!string.IsNullOrWhiteSpace(contact.Notes))
+                {
+                    <p class="contact-notes">💡 @contact.Notes</p>
+                }
+                @foreach (var lnk in contact.Links.Where(l => !string.IsNullOrWhiteSpace(l)))
+                {
+                    <a href="@lnk" target="_blank" rel="noopener" class="contact-action contact-link-url">
+                        🔗 @DisplayLink(lnk)
+                    </a>
+                }
+            </div>
+        }
+    }
+
+    @if (Store.Data.Contacts.Count == 0 && !Store.CanEdit)
+    {
+        <div class="empty-message">Aucun contact pour l'instant.</div>
+    }
+
+    @if (Store.CanEdit)
+    {
+        @if (_addingNew)
+        {
+            <div class="add-form contact-form">
+                @ContactFields()
+                @if (_error is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_error</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveAddAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                        @(_busy ? "⏳…" : "➕ Ajouter")
+                    </button>
+                </div>
+            </div>
+        }
+        else if (_editingId is null)
+        {
+            <button class="action-btn btn-add contact-add-btn" @onclick="StartAdd">
+                ➕ Ajouter un contact
+            </button>
+        }
+    }
+}
+
+@code {
+    private bool _addingNew;
+    private string? _editingId;
+    private bool _busy;
+    private string? _error;
+
+    private string? _fName;
+    private string? _fPerson;
+    private string? _fPhone;
+    private string? _fAddress;
+    private string? _fNotes;
+    private List<string> _fLinks = [];
+    private string? _newLinkInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnChanged;
+        await Store.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Store.Changed -= OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void StartAdd()
+    {
+        _addingNew = true;
+        _editingId = null;
+        _fName = null;
+        _fPerson = null;
+        _fPhone = null;
+        _fAddress = null;
+        _fNotes = null;
+        _fLinks = [];
+        _newLinkInput = null;
+        _error = null;
+    }
+
+    private void StartEdit(Contact c)
+    {
+        _editingId = c.Id;
+        _addingNew = false;
+        _fName = c.Name;
+        _fPerson = c.ContactPerson;
+        _fPhone = c.Phone;
+        _fAddress = c.Address;
+        _fNotes = c.Notes;
+        _fLinks = [.. c.Links];
+        _newLinkInput = null;
+        _error = null;
+    }
+
+    private void CancelForm()
+    {
+        _addingNew = false;
+        _editingId = null;
+        _error = null;
+    }
+
+    private void AddLink()
+    {
+        if (!string.IsNullOrWhiteSpace(_newLinkInput))
+        {
+            _fLinks.Add(_newLinkInput.Trim());
+            _newLinkInput = null;
+        }
+    }
+
+    private async Task SaveAddAsync()
+    {
+        _busy = true;
+        _error = null;
+        CommitPendingLink();
+
+        var id = Guid.NewGuid().ToString("N")[..10];
+        var c = BuildContact(id);
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.Contacts.Add(c);
+            return true;
+        });
+
+        _busy = false;
+        if (ok) { _addingNew = false; _fLinks = []; }
+        else _error = error;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        _busy = true;
+        _error = null;
+        CommitPendingLink();
+
+        var id = _editingId!;
+        var c = BuildContact(id);
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var idx = data.Contacts.FindIndex(x => x.Id == id);
+            if (idx < 0) return false;
+            data.Contacts[idx] = c;
+            return true;
+        });
+
+        _busy = false;
+        if (ok) _editingId = null;
+        else _error = error;
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        var (_, _) = await Store.SaveAsync(data =>
+        {
+            data.Contacts.RemoveAll(c => c.Id == id);
+            return true;
+        });
+    }
+
+    private void CommitPendingLink()
+    {
+        if (!string.IsNullOrWhiteSpace(_newLinkInput))
+        {
+            _fLinks.Add(_newLinkInput.Trim());
+            _newLinkInput = null;
+        }
+    }
+
+    private Contact BuildContact(string id) => new()
+    {
+        Id = id,
+        Name = _fName!.Trim(),
+        ContactPerson = string.IsNullOrWhiteSpace(_fPerson) ? null : _fPerson.Trim(),
+        Phone = string.IsNullOrWhiteSpace(_fPhone) ? null : _fPhone.Trim(),
+        Address = string.IsNullOrWhiteSpace(_fAddress) ? null : _fAddress.Trim(),
+        Notes = string.IsNullOrWhiteSpace(_fNotes) ? null : _fNotes.Trim(),
+        Links = _fLinks.Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l.Trim()).ToList()
+    };
+
+    private static string MapsUrl(string address) =>
+        $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(address)}";
+
+    private static string DisplayLink(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var path = uri.PathAndQuery.TrimEnd('/');
+            var host = uri.Host.TrimStart('w').TrimStart('w').TrimStart('w').TrimStart('.');
+            return path.Length > 1 ? host + path : host;
+        }
+        catch
+        {
+            return url.Length > 42 ? url[..42] + "…" : url;
+        }
+    }
+
+    private RenderFragment ContactFields() => __builder =>
+    {
+        <label class="form-field">
+            <span class="form-label">Nom *</span>
+            <input class="form-input" type="text" @bind="_fName"
+                   placeholder="ex : Fleuriste Dupont" autocapitalize="words" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">👤 Interlocuteur</span>
+            <input class="form-input" type="text" @bind="_fPerson"
+                   placeholder="ex : Marie" autocapitalize="words" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">📞 Téléphone</span>
+            <input class="form-input" type="tel" @bind="_fPhone"
+                   placeholder="+33 4 74 12 34 56" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">📍 Adresse</span>
+            <input class="form-input" type="text" @bind="_fAddress"
+                   placeholder="ex : 12 rue des Lilas, 69400 Anse" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">💡 Notes</span>
+            <textarea class="form-input form-textarea" @bind="_fNotes" rows="3"
+                      placeholder="ex : Livraison avant 10h, sonnez 2 fois"></textarea>
+        </label>
+        @if (_fLinks.Count > 0)
+        {
+            <div class="form-field">
+                <span class="form-label">🔗 Liens</span>
+                @for (int i = 0; i < _fLinks.Count; i++)
+                {
+                    var idx = i;
+                    <div class="link-row">
+                        <span class="link-row-url">@_fLinks[idx]</span>
+                        <button type="button" class="btn-card-icon" @onclick="() => _fLinks.RemoveAt(idx)">✕</button>
+                    </div>
+                }
+            </div>
+        }
+        <div class="add-form-row link-add-row">
+            <input class="form-input" type="url" @bind="_newLinkInput" @bind:event="oninput"
+                   placeholder="https://…" />
+            <button type="button" class="action-btn btn-clear link-add-btn"
+                    @onclick="AddLink"
+                    disabled="@string.IsNullOrWhiteSpace(_newLinkInput)">
+                + Lien
+            </button>
+        </div>
+    };
+}

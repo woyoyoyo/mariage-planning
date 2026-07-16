@@ -970,7 +970,121 @@ select.form-input {
 }
 
 /* --------------------------------------------------------------------------
-   Contacts (page personne)
+   Page Contacts (prestataires & lieux)
+   -------------------------------------------------------------------------- */
+
+.contact-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contact-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.contact-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--color-primary);
+    flex: 1;
+}
+
+.contact-detail {
+    font-size: 13px;
+    color: var(--color-text-soft);
+    font-weight: 600;
+}
+
+.contact-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--color-bg);
+    border-radius: 8px;
+    padding: 7px 10px;
+    word-break: break-all;
+}
+
+.contact-action:active {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.contact-link-url {
+    color: var(--color-accent);
+    font-size: 13px;
+}
+
+.contact-notes {
+    font-size: 13px;
+    color: var(--color-text-soft);
+    margin: 0;
+    padding: 6px 10px;
+    background: var(--color-accent-soft);
+    border-radius: 6px;
+    user-select: text;
+    white-space: pre-wrap;
+}
+
+.contact-form {
+    margin-bottom: 10px;
+}
+
+.contact-add-btn {
+    width: 100%;
+}
+
+.form-textarea {
+    min-height: 80px;
+    padding: 10px 14px;
+    resize: vertical;
+    user-select: text;
+    line-height: 1.4;
+    height: auto;
+}
+
+.link-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--color-border);
+}
+
+.link-row-url {
+    flex: 1;
+    font-size: 13px;
+    color: var(--color-accent);
+    word-break: break-all;
+}
+
+.link-add-row {
+    align-items: center;
+    gap: 8px;
+}
+
+.link-add-btn {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Contacts (page personne — boutons appel / itinéraire dans l'en-tête)
    -------------------------------------------------------------------------- */
 
 .contact-links {

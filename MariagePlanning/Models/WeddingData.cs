@@ -6,6 +6,7 @@ public class WeddingData
     public WeddingInfo Wedding { get; set; } = new();
     public List<Person> People { get; set; } = [];
     public List<Team> Teams { get; set; } = [];
+    public List<Contact> Contacts { get; set; } = [];
     public List<WeddingDay> Days { get; set; } = [];
 }
 
@@ -33,6 +34,17 @@ public class Team
     public string Name { get; set; } = "";
     public string Color { get; set; } = "#94a3b8";
     public List<string> MemberIds { get; set; } = [];
+}
+
+public class Contact
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";          // ex : "Fleuriste Dupont"
+    public string? ContactPerson { get; set; }      // ex : "Marie"
+    public string? Phone { get; set; }
+    public string? Address { get; set; }
+    public string? Notes { get; set; }
+    public List<string> Links { get; set; } = [];
 }
 
 public class WeddingDay
