@@ -72,5 +72,8 @@ public class TaskItem
     /// <summary>todo | done</summary>
     public string Status { get; set; } = "todo";
 
+    /// <summary>Ids des contacts (prestataires) impliqués dans cette tâche.</summary>
+    public List<string> ContactIds { get; set; } = [];
+
     public bool IsDone => Status == "done";
 }

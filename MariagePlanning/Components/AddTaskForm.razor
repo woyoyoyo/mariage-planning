@@ -2,7 +2,10 @@
 
 @if (!_open)
 {
-    <button class="action-btn btn-add" @onclick="OpenAsync">➕ Ajouter une tâche</button>
+    @if (Store.CanEdit)
+    {
+        <button class="action-btn btn-add" @onclick="OpenAsync">➕ Ajouter une tâche</button>
+    }
     @if (_hint is not null)
     {
         <div class="sync-status sync-warn">@_hint</div>
@@ -10,25 +13,45 @@
 }
 else
 {
-    <div class="add-form">
-        <div class="add-form-row">
-            <label class="form-field form-time">
-                <span class="form-label">Heure</span>
-                <input class="form-input" type="time" @bind="_time" />
-            </label>
-            <label class="form-field form-grow">
-                <span class="form-label">Titre *</span>
-                <input class="form-input" type="text" @bind="_title" placeholder="ex : Récupérer les fleurs" />
-            </label>
-        </div>
-
+    <div class="add-form task-form-card">
         <label class="form-field">
-            <span class="form-label">Notes</span>
-            <input class="form-input" type="text" @bind="_notes" placeholder="ex : Camionnette de Bernard" />
+            <span class="form-label">Titre *</span>
+            <input class="form-input task-title-input" type="text" @bind="_title"
+                   placeholder="ex : Récupérer les fleurs" autocapitalize="sentences" />
         </label>
 
+        <label class="form-field form-time-field">
+            <span class="form-label">⏰ Heure <span class="form-hint-inline">(optionnel)</span></span>
+            <input class="form-input form-time-input" type="time" @bind="_time" />
+        </label>
+
+        <label class="form-field">
+            <span class="form-label">💡 Notes <span class="form-hint-inline">(optionnel)</span></span>
+            <textarea class="form-input form-textarea" @bind="_notes" rows="2"
+                      placeholder="ex : Camionnette de Bernard, entrer par le portail arrière"></textarea>
+        </label>
+
+        @if ((Store.Data?.Contacts.Count ?? 0) > 0)
+        {
+            <div class="form-field">
+                <span class="form-label">📇 Contacts liés</span>
+                <div class="contact-checks">
+                    @foreach (var contact in Store.Data!.Contacts)
+                    {
+                        var cid = contact.Id;
+                        <label class="contact-check @(_contactIds.Contains(cid) ? "is-checked" : "")">
+                            <input type="checkbox"
+                                   checked="@_contactIds.Contains(cid)"
+                                   @onchange="e => ToggleContact(cid, e)" />
+                            @contact.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="form-field">
-            <span class="form-label">Qui ? <span class="form-hint-inline">(personne cochée = tout le monde)</span></span>
+            <span class="form-label">👤 Qui ? <span class="form-hint-inline">(vide = tout le monde)</span></span>
             @if ((Store.Data?.Teams.Count ?? 0) > 0)
             {
                 <div class="team-checks">
@@ -65,7 +88,8 @@ else
 
         <div class="add-form-actions">
             <button class="action-btn btn-clear" @onclick="Close" disabled="@_busy">Annuler</button>
-            <button class="action-btn btn-refresh" @onclick="SaveAsync" disabled="@(_busy || string.IsNullOrWhiteSpace(_title))">
+            <button class="action-btn btn-refresh" @onclick="SaveAsync"
+                    disabled="@(_busy || string.IsNullOrWhiteSpace(_title))">
                 @(_busy ? "⏳ Sauvegarde…" : "💾 Enregistrer")
             </button>
         </div>
@@ -85,6 +109,7 @@ else
     private string? _title;
     private string? _notes;
     private HashSet<string> _assigned = [];
+    private HashSet<string> _contactIds = [];
 
     private async Task OpenAsync()
     {
@@ -111,10 +136,8 @@ else
 
     private void ToggleAssigned(string personId, ChangeEventArgs e)
     {
-        if (e.Value is true)
-            _assigned.Add(personId);
-        else
-            _assigned.Remove(personId);
+        if (e.Value is true) _assigned.Add(personId);
+        else _assigned.Remove(personId);
     }
 
     private void ToggleTeam(string teamId)
@@ -126,6 +149,12 @@ else
             foreach (var mid in team.MemberIds) _assigned.Remove(mid);
         else
             foreach (var mid in team.MemberIds) _assigned.Add(mid);
+    }
+
+    private void ToggleContact(string contactId, ChangeEventArgs e)
+    {
+        if (e.Value is true) _contactIds.Add(contactId);
+        else _contactIds.Remove(contactId);
     }
 
     private async Task SaveAsync()
@@ -140,14 +169,14 @@ else
             Title = _title!.Trim(),
             Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
             AssignedTo = _assigned.ToList(),
+            ContactIds = _contactIds.ToList(),
             Status = "todo"
         };
 
         var (ok, error) = await Store.SaveAsync(data =>
         {
             var day = data.Days.FirstOrDefault(d => d.Date == Date);
-            if (day is null)
-                return false;
+            if (day is null) return false;
 
             day.Activities.Add(task);
             day.Activities = day.Activities
@@ -166,6 +195,7 @@ else
             _title = null;
             _notes = null;
             _assigned = [];
+            _contactIds = [];
         }
         else
         {

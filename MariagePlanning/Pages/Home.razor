@@ -60,6 +60,32 @@ else
         </div>
     </header>
 
+    @if ((Store.Data?.People.Count ?? 0) > 0)
+    {
+        <details class="stats-card" open>
+            <summary class="stats-summary">📊 Avancement — @DoneTasks / @TotalTasks tâches</summary>
+            <div class="stats-body">
+                <div class="stats-global-bar">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: @(PctAll)%"></div>
+                    </div>
+                    <span class="stats-global-pct">@PctAll %</span>
+                </div>
+                @foreach (var person in Store.Data!.People)
+                {
+                    var ps = PersonProgress(person);
+                    <div class="stats-person-row">
+                        <span class="stats-person-name" style="--person-color: @person.Color">@person.Name</span>
+                        <div class="progress-bar stats-mini-bar">
+                            <div class="progress-fill" style="width: @(ps.Pct)%"></div>
+                        </div>
+                        <span class="stats-person-count">@ps.Done/@ps.Total</span>
+                    </div>
+                }
+            </div>
+        </details>
+    }
+
     @foreach (var day in Store.OrderedDays)
     {
         <DaySection Day="day" />
@@ -110,4 +136,20 @@ else
 
     private async Task PrintAsync() =>
         await JS.InvokeVoidAsync("mariage.printPlan");
+
+    private int TotalTasks => Store.Data?.Days.Sum(d => d.Activities.Count) ?? 0;
+    private int DoneTasks => Store.Data?.Days.Sum(d => d.Activities.Count(t => t.IsDone)) ?? 0;
+    private int PctAll => TotalTasks == 0 ? 0 : (int)(DoneTasks * 100.0 / TotalTasks);
+
+    private (int Done, int Total, int Pct) PersonProgress(Person p)
+    {
+        if (Store.Data is null) return (0, 0, 0);
+        var tasks = Store.Data.Days
+            .SelectMany(d => d.Activities)
+            .Where(t => WeddingStore.ConcernsPerson(t, p.Id))
+            .ToList();
+        var done = tasks.Count(t => t.IsDone);
+        var total = tasks.Count;
+        return (done, total, total == 0 ? 0 : (int)(done * 100.0 / total));
+    }
 }

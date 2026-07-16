@@ -1402,6 +1402,182 @@ select.form-input {
     text-decoration: none;
 }
 
+/* --------------------------------------------------------------------------
+   Formulaire de tâche amélioré
+   -------------------------------------------------------------------------- */
+
+.task-form-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.task-title-input {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.form-time-field {
+    max-width: 200px;
+}
+
+.form-time-input {
+    width: 100%;
+}
+
+/* Contacts liés — même style que person-checks */
+.contact-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.contact-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-bg);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.contact-check input[type="checkbox"] {
+    display: none;
+}
+
+.contact-check.is-checked {
+    background: #e0f2fe;
+    border-color: #0369a1;
+    color: #0369a1;
+    font-weight: 600;
+}
+
+/* Contacts liés sur la carte de tâche */
+.task-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 4px;
+}
+
+.task-contact-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    border-radius: 14px;
+    padding: 2px 8px 2px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #0369a1;
+}
+
+.chip-phone {
+    font-size: 13px;
+    text-decoration: none;
+    line-height: 1;
+    padding: 1px 2px;
+    border-radius: 50%;
+}
+
+.chip-phone:active {
+    background: #bae6fd;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard global — widget avancement page "Tout"
+   -------------------------------------------------------------------------- */
+
+.stats-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.stats-summary {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    gap: 6px;
+    color: var(--color-text);
+}
+
+.stats-summary::-webkit-details-marker { display: none; }
+
+.stats-body {
+    padding: 10px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--color-border);
+}
+
+.stats-global-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.stats-global-bar .progress-bar {
+    flex: 1;
+    height: 10px;
+}
+
+.stats-global-pct {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-primary);
+    min-width: 34px;
+    text-align: right;
+}
+
+.stats-person-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stats-person-name {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--person-color, #9d174d) 15%, white);
+    color: color-mix(in srgb, var(--person-color, #9d174d) 80%, #000);
+    min-width: 80px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.stats-mini-bar {
+    flex: 1;
+    height: 6px;
+}
+
+.stats-person-count {
+    font-size: 12px;
+    color: var(--color-text-soft);
+    font-weight: 600;
+    min-width: 36px;
+    text-align: right;
+}
+
 @media print {
     /* Éléments interactifs masqués */
     .no-print,

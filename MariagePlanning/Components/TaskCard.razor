@@ -2,25 +2,43 @@
 
 @if (_editing)
 {
-    <div class="add-form edit-form">
-        <div class="add-form-row">
-            <label class="form-field form-time">
-                <span class="form-label">Heure</span>
-                <input class="form-input" type="time" @bind="_eTime" />
-            </label>
-            <label class="form-field form-grow">
-                <span class="form-label">Titre *</span>
-                <input class="form-input" type="text" @bind="_eTitle" />
-            </label>
-        </div>
-
+    <div class="add-form edit-form task-form-card">
         <label class="form-field">
-            <span class="form-label">Notes</span>
-            <input class="form-input" type="text" @bind="_eNotes" />
+            <span class="form-label">Titre *</span>
+            <input class="form-input task-title-input" type="text" @bind="_eTitle" autocapitalize="sentences" />
         </label>
 
+        <label class="form-field form-time-field">
+            <span class="form-label">⏰ Heure <span class="form-hint-inline">(optionnel)</span></span>
+            <input class="form-input form-time-input" type="time" @bind="_eTime" />
+        </label>
+
+        <label class="form-field">
+            <span class="form-label">💡 Notes <span class="form-hint-inline">(optionnel)</span></span>
+            <textarea class="form-input form-textarea" @bind="_eNotes" rows="2"></textarea>
+        </label>
+
+        @if ((Store.Data?.Contacts.Count ?? 0) > 0)
+        {
+            <div class="form-field">
+                <span class="form-label">📇 Contacts liés</span>
+                <div class="contact-checks">
+                    @foreach (var contact in Store.Data!.Contacts)
+                    {
+                        var cid = contact.Id;
+                        <label class="contact-check @(_eContactIds.Contains(cid) ? "is-checked" : "")">
+                            <input type="checkbox"
+                                   checked="@_eContactIds.Contains(cid)"
+                                   @onchange="e => ToggleContactInEdit(cid, e)" />
+                            @contact.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="form-field">
-            <span class="form-label">Qui ? <span class="form-hint-inline">(personne cochée = tout le monde)</span></span>
+            <span class="form-label">👤 Qui ? <span class="form-hint-inline">(vide = tout le monde)</span></span>
             @if ((Store.Data?.Teams.Count ?? 0) > 0)
             {
                 <div class="team-checks">
@@ -100,6 +118,24 @@ else
             <p class="task-notes">💡 @Task.Notes</p>
         }
 
+        @if (Task.ContactIds.Count > 0)
+        {
+            <div class="task-contacts" @onclick:stopPropagation="true">
+                @foreach (var cid in Task.ContactIds)
+                {
+                    var contact = Store.Data?.Contacts.FirstOrDefault(c => c.Id == cid);
+                    if (contact is null) continue;
+                    <span class="task-contact-chip">
+                        <span class="chip-name">@contact.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(contact.Phone))
+                        {
+                            <a href="tel:@contact.Phone" class="chip-phone" title="Appeler @contact.Name">📞</a>
+                        }
+                    </span>
+                }
+            </div>
+        }
+
         @if (_toggleError is not null)
         {
             <div class="sync-status sync-warn">⚠️ @_toggleError</div>
@@ -134,20 +170,18 @@ else
     [Parameter]
     public bool HideTime { get; set; }
 
-    // --- état global ---
     private bool _confirming;
     private bool _editing;
     private bool _busy;
     private string? _error;
     private string? _toggleError;
 
-    // --- champs du formulaire d'édition ---
     private TimeOnly? _eTime;
     private string? _eTitle;
     private string? _eNotes;
     private HashSet<string> _eAssigned = [];
+    private HashSet<string> _eContactIds = [];
 
-    /// <summary>Tap sur la carte = bascule todo/done (le geste principal du Jour J).</summary>
     private async Task ToggleDoneAsync()
     {
         if (!Store.CanEdit || _busy || _confirming)
@@ -178,6 +212,7 @@ else
         _eTitle = Task.Title;
         _eNotes = Task.Notes;
         _eAssigned = [.. Task.AssignedTo];
+        _eContactIds = [.. Task.ContactIds];
         _error = null;
         _editing = true;
     }
@@ -190,10 +225,8 @@ else
 
     private void ToggleAssigned(string personId, ChangeEventArgs e)
     {
-        if (e.Value is true)
-            _eAssigned.Add(personId);
-        else
-            _eAssigned.Remove(personId);
+        if (e.Value is true) _eAssigned.Add(personId);
+        else _eAssigned.Remove(personId);
     }
 
     private void ToggleTeam(string teamId)
@@ -207,6 +240,12 @@ else
             foreach (var mid in team.MemberIds) _eAssigned.Add(mid);
     }
 
+    private void ToggleContactInEdit(string contactId, ChangeEventArgs e)
+    {
+        if (e.Value is true) _eContactIds.Add(contactId);
+        else _eContactIds.Remove(contactId);
+    }
+
     private async Task SaveEditAsync()
     {
         _busy = true;
@@ -217,6 +256,7 @@ else
         var title = _eTitle!.Trim();
         var notes = string.IsNullOrWhiteSpace(_eNotes) ? null : _eNotes.Trim();
         var assigned = _eAssigned.ToList();
+        var contactIds = _eContactIds.ToList();
 
         var (ok, error) = await Store.SaveAsync(data =>
         {
@@ -229,6 +269,7 @@ else
             task.Title = title;
             task.Notes = notes;
             task.AssignedTo = assigned;
+            task.ContactIds = contactIds;
 
             day.Activities = day.Activities
                 .OrderBy(a => a.Time is not null)
