@@ -1,0 +1,127 @@
+{
+  "wedding": {
+    "name": "Mariage Yoann & Léa",
+    "date": "2027-06-12",
+    "lastUpdated": "2026-07-16T12:00:00Z"
+  },
+  "people": [
+    { "id": "yoann", "name": "Yoann", "color": "#6366f1" },
+    { "id": "lea", "name": "Léa", "color": "#ec4899" },
+    { "id": "benedicte", "name": "Bénédicte", "color": "#f59e0b" },
+    { "id": "sabine", "name": "Sabine", "color": "#10b981" }
+  ],
+  "days": [
+    {
+      "date": "2027-06-10",
+      "label": "J-2 — Préparation",
+      "activities": [
+        {
+          "id": "t-demo-001",
+          "time": "16:00",
+          "title": "Récupération fleurs + dépôt salle",
+          "assignedTo": ["yoann", "benedicte", "sabine"],
+          "notes": "Camionnette de Bernard",
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-002",
+          "time": "18:30",
+          "title": "Essayage final des tenues",
+          "assignedTo": ["lea"],
+          "notes": null,
+          "status": "todo"
+        }
+      ]
+    },
+    {
+      "date": "2027-06-11",
+      "label": "J-1 — Installation",
+      "activities": [
+        {
+          "id": "t-demo-003",
+          "time": "10:00",
+          "title": "Décoration de la salle",
+          "assignedTo": [],
+          "notes": "Tout le monde sur le pont !",
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-004",
+          "time": "14:00",
+          "title": "Répétition cérémonie",
+          "assignedTo": ["yoann", "lea"],
+          "notes": null,
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-005",
+          "time": "17:00",
+          "title": "Accueil des invités arrivés en avance",
+          "assignedTo": ["benedicte"],
+          "notes": null,
+          "status": "todo"
+        }
+      ]
+    },
+    {
+      "date": "2027-06-12",
+      "label": "Jour J — Mariage ✨",
+      "activities": [
+        {
+          "id": "t-demo-006",
+          "time": "09:00",
+          "title": "Coiffure & maquillage",
+          "assignedTo": ["lea"],
+          "notes": null,
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-007",
+          "time": "10:30",
+          "title": "Récupérer le gâteau chez le pâtissier",
+          "assignedTo": ["sabine"],
+          "notes": "Prévoir le grand coffre",
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-008",
+          "time": "14:00",
+          "title": "Cérémonie",
+          "assignedTo": [],
+          "notes": null,
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-009",
+          "time": "19:00",
+          "title": "Dîner & soirée",
+          "assignedTo": [],
+          "notes": null,
+          "status": "todo"
+        }
+      ]
+    },
+    {
+      "date": "2027-06-13",
+      "label": "J+1 — Rangement & brunch",
+      "activities": [
+        {
+          "id": "t-demo-010",
+          "time": "11:00",
+          "title": "Brunch avec les proches",
+          "assignedTo": [],
+          "notes": null,
+          "status": "todo"
+        },
+        {
+          "id": "t-demo-011",
+          "time": "15:00",
+          "title": "Rangement de la salle + rendre les clés",
+          "assignedTo": ["yoann", "benedicte"],
+          "notes": null,
+          "status": "todo"
+        }
+      ]
+    }
+  ]
+}

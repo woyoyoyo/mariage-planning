@@ -1,0 +1,53 @@
+@page "/moi"
+@inject WeddingStore Store
+@inject SettingsService Config
+@inject NavigationManager Nav
+
+<PageTitle>Mariage Planning — Moi</PageTitle>
+
+@if (!_ready)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else
+{
+    <header class="page-header">
+        <h1>👤 Qui es-tu ?</h1>
+        <div class="wedding-sub">Ton choix est mémorisé sur ce téléphone — l'onglet Moi affichera ton planning.</div>
+    </header>
+
+    <div class="person-picker">
+        @foreach (var person in Store.Data?.People ?? [])
+        {
+            <button class="person-pick" style="--person-color: @person.Color"
+                    @onclick="() => PickAsync(person.Id)">
+                @person.Name
+            </button>
+        }
+    </div>
+}
+
+@code {
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Config.EnsureLoadedAsync();
+        await Store.EnsureLoadedAsync();
+
+        // Personne déjà choisie (et toujours existante) : direction son planning.
+        if (Config.CurrentPerson is { } id && Store.PersonById(id) is not null)
+        {
+            Nav.NavigateTo($"personne/{id}", replace: true);
+            return;
+        }
+
+        _ready = true;
+    }
+
+    private async Task PickAsync(string personId)
+    {
+        await Config.SetCurrentPersonAsync(personId);
+        Nav.NavigateTo($"personne/{personId}");
+    }
+}

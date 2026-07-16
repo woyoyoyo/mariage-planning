@@ -1,0 +1,117 @@
+@page "/parametres"
+@inject SettingsService Config
+@inject WeddingStore Store
+
+<PageTitle>Mariage Planning — Paramètres</PageTitle>
+
+<header class="page-header">
+    <h1>⚙️ Paramètres</h1>
+</header>
+
+<div class="settings-form">
+    <label class="form-field">
+        <span class="form-label">ID du Gist</span>
+        <input class="form-input" type="text" @bind="_gistId"
+               placeholder="ex : bd451c30da0d..." autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <span class="form-hint">La chaîne dans l'URL du Gist (gist.github.com/toncompte/<b>ID</b>). Suffit pour lire le planning.</span>
+    </label>
+
+    <label class="form-field">
+        <span class="form-label">Token GitHub (PAT)</span>
+        <input class="form-input" type="@(_showToken ? "text" : "password")" @bind="_token"
+               placeholder="ghp_..." autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <span class="form-hint">Nécessaire uniquement pour modifier le planning. Stocké sur ce téléphone, nulle part ailleurs.</span>
+    </label>
+
+    <label class="show-token">
+        <input type="checkbox" @bind="_showToken" /> Afficher le token
+    </label>
+
+    <button class="action-btn btn-refresh" @onclick="SaveAsync" disabled="@_busy">
+        @(_busy ? "⏳ Vérification…" : "💾 Enregistrer et tester")
+    </button>
+
+    @if (_feedback is not null)
+    {
+        <div class="sync-status @_feedbackClass">@_feedback</div>
+    }
+
+    @if (Store.Data?.People.Count > 0)
+    {
+        <div class="form-field">
+            <span class="form-label">Qui es-tu ? (onglet Moi)</span>
+            <select class="form-input" value="@(Config.CurrentPerson ?? "")" @onchange="OnPersonChangedAsync">
+                <option value="">— Non défini —</option>
+                @foreach (var person in Store.Data.People)
+                {
+                    <option value="@person.Id">@person.Name</option>
+                }
+            </select>
+        </div>
+    }
+
+    <button class="action-btn btn-clear" @onclick="ClearAsync" disabled="@_busy">
+        🗑️ Effacer la configuration
+    </button>
+
+    <p class="app-version">Mariage Planning — v@(AppInfo.Version)</p>
+</div>
+
+@code {
+    private string? _gistId;
+    private string? _token;
+    private bool _showToken;
+    private bool _busy;
+    private string? _feedback;
+    private string _feedbackClass = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Config.EnsureLoadedAsync();
+        await Store.EnsureLoadedAsync();
+        _gistId = Config.GistId;
+        _token = Config.Token;
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _feedback = null;
+
+        await Config.SaveAsync(_gistId, _token);
+        await Store.ReloadAsync();
+
+        if (Store.Source == DataSource.Gist)
+        {
+            var days = Store.Data?.Days.Count ?? 0;
+            _feedback = $"✅ Connecté au Gist — {days} jour(s) chargé(s).";
+            _feedbackClass = "sync-ok";
+        }
+        else if (!Config.IsConfigured)
+        {
+            _feedback = "ℹ️ Aucun Gist configuré — l'app affiche la démo.";
+            _feedbackClass = "sync-demo";
+        }
+        else
+        {
+            _feedback = $"⚠️ Connexion impossible : {Store.LoadError ?? "vérifie l'ID du Gist et le réseau"}";
+            _feedbackClass = "sync-warn";
+        }
+
+        _busy = false;
+    }
+
+    private async Task OnPersonChangedAsync(ChangeEventArgs e) =>
+        await Config.SetCurrentPersonAsync(e.Value?.ToString());
+
+    private async Task ClearAsync()
+    {
+        _gistId = null;
+        _token = null;
+        await Config.SaveAsync(null, null);
+        await Config.SetCurrentPersonAsync(null);
+        await Store.ReloadAsync();
+        _feedback = "🗑️ Configuration effacée — retour aux données de démo.";
+        _feedbackClass = "sync-demo";
+    }
+}

@@ -1,0 +1,113 @@
+@page "/"
+@implements IDisposable
+@inject WeddingStore Store
+@inject IJSRuntime JS
+
+<PageTitle>Mariage Planning</PageTitle>
+
+@if (Store.Data is null)
+{
+    @if (Store.LoadError is not null)
+    {
+        <div class="load-error">
+            <p>⚠️ Impossible de charger le planning.</p>
+            <p class="error-detail">@Store.LoadError</p>
+            <button class="action-btn btn-refresh" @onclick="ReloadAsync">🔄 Réessayer</button>
+        </div>
+    }
+    else
+    {
+        <div class="loading-message">Chargement du planning…</div>
+    }
+}
+else
+{
+    <header class="page-header">
+        <h1>@Store.Data.Wedding.Name</h1>
+        <div class="wedding-sub">
+            @if (Store.OrderedDays.Count > 0)
+            {
+                <span>@FrenchDate.Range(Store.OrderedDays[0].Date, Store.OrderedDays[^1].Date)</span>
+            }
+        </div>
+        @if (CountdownText is not null)
+        {
+            <div class="wedding-countdown">@CountdownText</div>
+        }
+
+        @switch (Store.Source)
+        {
+            case DataSource.Gist:
+                <div class="sync-status sync-ok">✅ Synchronisé @SyncTime</div>
+                break;
+            case DataSource.Cache:
+                <div class="sync-status sync-offline">📵 Hors ligne — données synchronisées @SyncTime</div>
+                break;
+            case DataSource.Demo:
+                <div class="sync-status sync-demo">🧪 Données de démo — <a href="parametres">configurer l'app</a></div>
+                break;
+        }
+        @if (Store.LoadError is not null && Store.Data is not null)
+        {
+            <div class="sync-status sync-warn">⚠️ @Store.LoadError</div>
+        }
+
+        <div class="header-actions no-print">
+            <button class="action-btn btn-refresh" @onclick="ReloadAsync" disabled="@_reloading">
+                @(_reloading ? "⏳ Actualisation…" : "🔄 Actualiser")
+            </button>
+            <button class="action-btn btn-print" @onclick="PrintAsync" title="Exporter en PDF">🖨️ PDF</button>
+        </div>
+    </header>
+
+    @foreach (var day in Store.OrderedDays)
+    {
+        <DaySection Day="day" />
+    }
+}
+
+@code {
+    private bool _reloading;
+
+    private string SyncTime =>
+        Store.LastSync is { } d ? $"le {d:dd/MM} à {d:HH\\hmm}" : "";
+
+    private string? CountdownText
+    {
+        get
+        {
+            if (Store.WeddingDate is not { } weddingDay)
+                return null;
+            var today = DateOnly.FromDateTime(DateTime.Now);
+
+            if (today < weddingDay)
+            {
+                var days = weddingDay.DayNumber - today.DayNumber;
+                return days == 1 ? "C'est demain ! 💍" : $"J-{days} avant le mariage 💍";
+            }
+            if (today == weddingDay)
+                return "C'est le grand jour ! ✨💍";
+            return "Mariés ! 🥂";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnStoreChanged;
+        await Store.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Store.Changed -= OnStoreChanged;
+
+    private void OnStoreChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ReloadAsync()
+    {
+        _reloading = true;
+        await Store.ReloadAsync();
+        _reloading = false;
+    }
+
+    private async Task PrintAsync() =>
+        await JS.InvokeVoidAsync("mariage.printPlan");
+}

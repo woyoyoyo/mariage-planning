@@ -1,0 +1,108 @@
+@inject WeddingStore Store
+@inject IJSRuntime JS
+
+<details class="day-card @(IsWeddingDay ? "day-wedding" : "")" open="@(IsWeddingDay || IsToday)" id="day-@Day.Date.ToString("yyyy-MM-dd")">
+    <summary class="day-summary">
+        <div class="day-summary-main">
+            <div class="day-summary-text">
+                <span class="day-date">@FrenchDate.Long(Day.Date)</span>
+                <span class="day-title">@Day.Label</span>
+            </div>
+        </div>
+        <div class="day-badges">
+            @if (IsWeddingDay)
+            {
+                <span class="badge badge-wedding">✨ Jour J</span>
+            }
+            @if (IsToday)
+            {
+                <span class="badge badge-today">Aujourd'hui</span>
+            }
+            @if (TodoCount > 0)
+            {
+                <span class="badge badge-todo">@DoneCount/@(TodoCount + DoneCount)</span>
+            }
+            <button class="btn-share-day no-print"
+                    @onclick="ShareAsync"
+                    @onclick:stopPropagation="true"
+                    title="Partager ce jour">📤</button>
+        </div>
+    </summary>
+
+    <div class="day-body">
+        @foreach (var task in SortedTasks)
+        {
+            <TaskCard Task="task" Date="Day.Date" />
+        }
+
+        @if (Day.Activities.Count == 0)
+        {
+            <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+        }
+
+        @if (PersonId is null)
+        {
+            <AddTaskForm Date="Day.Date" />
+        }
+    </div>
+</details>
+
+@code {
+    [Parameter, EditorRequired]
+    public WeddingDay Day { get; set; } = default!;
+
+    /// <summary>Si renseigné, n'affiche que les tâches concernant cette personne (vue "Mon planning").</summary>
+    [Parameter]
+    public string? PersonId { get; set; }
+
+    private bool IsToday => Day.Date == DateOnly.FromDateTime(DateTime.Now);
+    private bool IsWeddingDay => Store.IsWeddingDay(Day);
+
+    private IEnumerable<TaskItem> FilteredTasks =>
+        PersonId is null
+            ? Day.Activities
+            : Day.Activities.Where(t => WeddingStore.ConcernsPerson(t, PersonId));
+
+    private IEnumerable<TaskItem> SortedTasks =>
+        FilteredTasks
+            .OrderBy(t => t.Time is not null)
+            .ThenBy(t => t.Time, StringComparer.Ordinal);
+
+    private int TodoCount => FilteredTasks.Count(t => !t.IsDone);
+    private int DoneCount => FilteredTasks.Count(t => t.IsDone);
+
+    private async Task ShareAsync()
+    {
+        var text = BuildShareText();
+        try
+        {
+            await JS.InvokeVoidAsync("mariage.shareText", text);
+        }
+        catch { /* share non supporté ou annulé */ }
+    }
+
+    private string BuildShareText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"📅 {FrenchDate.Long(Day.Date)} — {Day.Label}");
+        sb.AppendLine();
+
+        foreach (var t in SortedTasks)
+        {
+            var check = t.IsDone ? "✅" : "⬜";
+            var time = t.Time is not null ? $"{t.Time}  " : "";
+            sb.AppendLine($"{check} {time}{t.Title}");
+
+            var people = t.AssignedTo.Count == 0
+                ? "Tout le monde"
+                : string.Join(", ", Store.AssignedPeople(t).Select(p => p.Name));
+            sb.AppendLine($"  👤 {people}");
+            if (!string.IsNullOrWhiteSpace(t.Notes))
+                sb.AppendLine($"  💡 {t.Notes}");
+        }
+
+        sb.AppendLine();
+        sb.Append("— Mariage Planning 💍");
+        return sb.ToString().Trim();
+    }
+}

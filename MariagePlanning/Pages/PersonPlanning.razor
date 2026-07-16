@@ -1,0 +1,132 @@
+@page "/personne/{PersonId}"
+@implements IDisposable
+@inject WeddingStore Store
+@inject SettingsService Config
+@inject IJSRuntime JS
+
+<PageTitle>Mariage Planning — Mon planning</PageTitle>
+
+@if (Store.Data is null)
+{
+    <div class="loading-message">Chargement du planning…</div>
+}
+else if (Person is null)
+{
+    <div class="load-error">
+        <p>⚠️ Personne inconnue.</p>
+        <a class="action-btn btn-refresh" href="">Retour au planning complet</a>
+    </div>
+}
+else
+{
+    <header class="page-header person-header" style="--person-color: @Person.Color">
+        <h1>👤 @Person.Name</h1>
+        <div class="wedding-sub">@Store.Data.Wedding.Name — planning personnel</div>
+
+        <div class="person-stats">
+            @if (TotalCount == 0)
+            {
+                <span>Aucune tâche pour l'instant.</span>
+            }
+            else
+            {
+                <span>@DoneCount/@TotalCount tâche@(TotalCount > 1 ? "s" : "") faite@(DoneCount > 1 ? "s" : "")</span>
+            }
+        </div>
+
+        <div class="header-actions no-print">
+            <button class="action-btn btn-refresh" @onclick="ShareAsync">📤 Partager sur WhatsApp</button>
+            <button class="action-btn btn-print" @onclick="PrintAsync" title="Exporter en PDF">🖨️ PDF</button>
+        </div>
+
+        @if (!IsMe)
+        {
+            <button class="btn-its-me no-print" @onclick="SetAsMeAsync">⭐ C'est moi — afficher ce planning dans l'onglet Moi</button>
+        }
+        else
+        {
+            <div class="its-me-hint no-print">⭐ C'est toi — ce planning s'affiche dans l'onglet Moi</div>
+        }
+    </header>
+
+    @foreach (var day in Store.OrderedDays)
+    {
+        <DaySection Day="day" PersonId="@PersonId" />
+    }
+}
+
+@code {
+    [Parameter]
+    public string PersonId { get; set; } = "";
+
+    private bool IsMe => Config.CurrentPerson == PersonId;
+    private Person? Person => Store.PersonById(PersonId);
+
+    private IEnumerable<TaskItem> MyTasks =>
+        Store.OrderedDays
+            .SelectMany(d => d.Activities)
+            .Where(t => WeddingStore.ConcernsPerson(t, PersonId));
+
+    private int TotalCount => MyTasks.Count();
+    private int DoneCount => MyTasks.Count(t => t.IsDone);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnStoreChanged;
+        await Config.EnsureLoadedAsync();
+        await Store.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Store.Changed -= OnStoreChanged;
+
+    private void OnStoreChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SetAsMeAsync() =>
+        await Config.SetCurrentPersonAsync(PersonId);
+
+    private async Task PrintAsync() =>
+        await JS.InvokeVoidAsync("mariage.printPlan");
+
+    private async Task ShareAsync()
+    {
+        var text = BuildShareText();
+        try
+        {
+            await JS.InvokeVoidAsync("mariage.shareText", text);
+        }
+        catch { /* share non supporté ou annulé */ }
+    }
+
+    private string BuildShareText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"💍 {Store.Data!.Wedding.Name}");
+        sb.AppendLine($"👤 Planning de {Person!.Name}");
+
+        foreach (var day in Store.OrderedDays)
+        {
+            var tasks = day.Activities
+                .Where(t => WeddingStore.ConcernsPerson(t, PersonId))
+                .OrderBy(t => t.Time is not null)
+                .ThenBy(t => t.Time, StringComparer.Ordinal)
+                .ToList();
+            if (tasks.Count == 0)
+                continue;
+
+            sb.AppendLine();
+            sb.AppendLine($"📅 {FrenchDate.Long(day.Date)} — {day.Label}");
+            foreach (var t in tasks)
+            {
+                var check = t.IsDone ? "✅" : "⬜";
+                var time = t.Time is not null ? $"{t.Time}  " : "";
+                sb.AppendLine($"{check} {time}{t.Title}");
+                if (!string.IsNullOrWhiteSpace(t.Notes))
+                    sb.AppendLine($"  💡 {t.Notes}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.Append("— Mariage Planning 💍");
+        return sb.ToString().Trim();
+    }
+}

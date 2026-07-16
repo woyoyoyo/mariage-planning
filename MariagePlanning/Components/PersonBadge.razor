@@ -1,0 +1,15 @@
+@* Badge coloré d'une personne assignée. Vide = badge "Tout le monde". *@
+
+@if (Person is not null)
+{
+    <span class="person-badge" style="--person-color: @Person.Color">@Person.Name</span>
+}
+else
+{
+    <span class="person-badge person-badge-all">👥 Tout le monde</span>
+}
+
+@code {
+    [Parameter]
+    public Person? Person { get; set; }
+}

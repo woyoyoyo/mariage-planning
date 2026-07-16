@@ -1,0 +1,248 @@
+@inject WeddingStore Store
+
+@if (_editing)
+{
+    <div class="add-form edit-form">
+        <div class="add-form-row">
+            <label class="form-field form-time">
+                <span class="form-label">Heure</span>
+                <input class="form-input" type="time" @bind="_eTime" />
+            </label>
+            <label class="form-field form-grow">
+                <span class="form-label">Titre *</span>
+                <input class="form-input" type="text" @bind="_eTitle" />
+            </label>
+        </div>
+
+        <label class="form-field">
+            <span class="form-label">Notes</span>
+            <input class="form-input" type="text" @bind="_eNotes" />
+        </label>
+
+        <div class="form-field">
+            <span class="form-label">Qui ? <span class="form-hint-inline">(personne cochée = tout le monde)</span></span>
+            <div class="person-checks">
+                @foreach (var person in Store.Data?.People ?? [])
+                {
+                    <label class="person-check @(_eAssigned.Contains(person.Id) ? "is-checked" : "")"
+                           style="--person-color: @person.Color">
+                        <input type="checkbox"
+                               checked="@_eAssigned.Contains(person.Id)"
+                               @onchange="e => ToggleAssigned(person.Id, e)" />
+                        @person.Name
+                    </label>
+                }
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="sync-status sync-warn">⚠️ @_error</div>
+        }
+
+        <div class="add-form-actions">
+            <button class="action-btn btn-clear" @onclick="CancelEdit" disabled="@_busy">Annuler</button>
+            <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
+                    disabled="@(_busy || string.IsNullOrWhiteSpace(_eTitle))">
+                @(_busy ? "⏳ Sauvegarde…" : "💾 Enregistrer")
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="task-card @(Task.IsDone ? "is-done" : "")" @onclick="ToggleDoneAsync">
+        <div class="task-head">
+            <span class="task-check">@(Task.IsDone ? "✅" : "⬜")</span>
+            @if (Task.Time is not null)
+            {
+                <span class="task-time">@Task.Time</span>
+            }
+            <span class="task-title">@Task.Title</span>
+            @if (Store.CanEdit && !_confirming)
+            {
+                <button class="btn-card-icon" @onclick="OpenEdit" @onclick:stopPropagation="true" title="Modifier">✏️</button>
+                <button class="btn-card-icon" @onclick="ToggleConfirm" @onclick:stopPropagation="true" title="Supprimer">🗑️</button>
+            }
+        </div>
+
+        <div class="task-people">
+            @if (Task.AssignedTo.Count == 0)
+            {
+                <PersonBadge Person="null" />
+            }
+            else
+            {
+                @foreach (var person in Store.AssignedPeople(Task))
+                {
+                    <PersonBadge Person="person" />
+                }
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Task.Notes))
+        {
+            <p class="task-notes">💡 @Task.Notes</p>
+        }
+
+        @if (_toggleError is not null)
+        {
+            <div class="sync-status sync-warn">⚠️ @_toggleError</div>
+        }
+
+        @if (_confirming)
+        {
+            <div class="delete-confirm" @onclick:stopPropagation="true">
+                <span class="delete-confirm-text">Supprimer « @Task.Title » ?</span>
+                <div class="delete-confirm-actions">
+                    <button class="action-btn btn-clear" @onclick="ToggleConfirm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-delete-yes" @onclick="DeleteAsync" disabled="@_busy">
+                        @(_busy ? "⏳…" : "🗑️ Supprimer")
+                    </button>
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_error</div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public DateOnly Date { get; set; }
+
+    // --- état global ---
+    private bool _confirming;
+    private bool _editing;
+    private bool _busy;
+    private string? _error;
+    private string? _toggleError;
+
+    // --- champs du formulaire d'édition ---
+    private TimeOnly? _eTime;
+    private string? _eTitle;
+    private string? _eNotes;
+    private HashSet<string> _eAssigned = [];
+
+    /// <summary>Tap sur la carte = bascule todo/done (le geste principal du Jour J).</summary>
+    private async Task ToggleDoneAsync()
+    {
+        if (!Store.CanEdit || _busy || _confirming)
+            return;
+
+        _busy = true;
+        _toggleError = null;
+        var id = Task.Id;
+        var date = Date;
+        var newStatus = Task.IsDone ? "todo" : "done";
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var task = FindTask(data, date, id);
+            if (task is null) return false;
+            task.Status = newStatus;
+            return true;
+        });
+
+        _busy = false;
+        if (!ok)
+            _toggleError = error;
+    }
+
+    private void OpenEdit()
+    {
+        _eTime = Task.Time is not null && TimeOnly.TryParse(Task.Time, out var t) ? t : null;
+        _eTitle = Task.Title;
+        _eNotes = Task.Notes;
+        _eAssigned = [.. Task.AssignedTo];
+        _error = null;
+        _editing = true;
+    }
+
+    private void CancelEdit()
+    {
+        _editing = false;
+        _error = null;
+    }
+
+    private void ToggleAssigned(string personId, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+            _eAssigned.Add(personId);
+        else
+            _eAssigned.Remove(personId);
+    }
+
+    private async Task SaveEditAsync()
+    {
+        _busy = true;
+        _error = null;
+        var id = Task.Id;
+        var date = Date;
+        var time = _eTime?.ToString("HH:mm");
+        var title = _eTitle!.Trim();
+        var notes = string.IsNullOrWhiteSpace(_eNotes) ? null : _eNotes.Trim();
+        var assigned = _eAssigned.ToList();
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            if (day is null) return false;
+            var task = day.Activities.FirstOrDefault(a => a.Id == id);
+            if (task is null) return false;
+
+            task.Time = time;
+            task.Title = title;
+            task.Notes = notes;
+            task.AssignedTo = assigned;
+
+            day.Activities = day.Activities
+                .OrderBy(a => a.Time is not null)
+                .ThenBy(a => a.Time, StringComparer.Ordinal)
+                .ToList();
+            return true;
+        });
+
+        _busy = false;
+        if (ok)
+            _editing = false;
+        else
+            _error = error;
+    }
+
+    private void ToggleConfirm()
+    {
+        _confirming = !_confirming;
+        _error = null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        _busy = true;
+        _error = null;
+        var id = Task.Id;
+        var date = Date;
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            if (day is null) return false;
+            return day.Activities.RemoveAll(a => a.Id == id) > 0;
+        });
+
+        _busy = false;
+        if (ok)
+            _confirming = false;
+        else
+            _error = error;
+    }
+
+    private static TaskItem? FindTask(WeddingData data, DateOnly date, string id) =>
+        data.Days.FirstOrDefault(d => d.Date == date)?
+            .Activities.FirstOrDefault(a => a.Id == id);
+}

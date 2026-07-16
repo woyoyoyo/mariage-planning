@@ -1,0 +1,852 @@
+/* ==========================================================================
+   Mariage Planning — CSS mobile-first, sans framework.
+   Repris de RoadTrip QC : fort contraste, grosses zones tactiles.
+   ========================================================================== */
+
+:root {
+    /* Palette "mariage" : ivoire, bordeaux/rose profond, doré */
+    --color-bg: #faf6f1;
+    --color-card: #ffffff;
+    --color-text: #21252b;
+    --color-text-soft: #5b6470;
+    --color-primary: #9d174d;
+    --color-primary-soft: #fce7f3;
+    --color-accent: #b45309;
+    --color-accent-soft: #fef3c7;
+    --color-alert: #dc2626;
+    --color-alert-soft: #fee2e2;
+    --color-done: #15803d;
+    --color-done-soft: #dcfce7;
+    --color-border: #ece4d8;
+    --header-grad: linear-gradient(150deg, #831843, #9d174d 55%, #be185d);
+    --radius: 14px;
+    --nav-height: 64px;
+    --shadow: 0 2px 6px rgba(60, 42, 20, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+}
+
+/* --------------------------------------------------------------------------
+   Structure : contenu scrollable + bottom nav fixe
+   -------------------------------------------------------------------------- */
+
+.app-shell {
+    min-height: 100dvh;
+}
+
+.app-content {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 12px 12px calc(var(--nav-height) + 20px) 12px;
+    user-select: none;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--color-card);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    z-index: 100;
+}
+
+.bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    text-decoration: none;
+    color: var(--color-text-soft);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.bottom-nav-item.active {
+    color: var(--color-primary);
+    position: relative;
+}
+
+.bottom-nav-item.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--color-accent);
+}
+
+.bn-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+/* --------------------------------------------------------------------------
+   En-tête de page
+   -------------------------------------------------------------------------- */
+
+.page-header {
+    position: relative;
+    overflow: hidden;
+    background: var(--header-grad);
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 18px 16px 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+}
+
+/* Alliances en filigrane */
+.page-header::after {
+    content: "💍";
+    position: absolute;
+    right: -8px;
+    top: -14px;
+    font-size: 74px;
+    opacity: 0.22;
+    transform: rotate(18deg);
+    pointer-events: none;
+}
+
+.page-header h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    letter-spacing: 0.01em;
+}
+
+.wedding-sub {
+    color: rgba(255, 255, 255, 0.88);
+    margin-bottom: 12px;
+    text-transform: capitalize;
+}
+
+.wedding-countdown {
+    font-size: 19px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.01em;
+    margin-bottom: 10px;
+}
+
+.page-header .btn-refresh {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    color: #fff;
+}
+
+.sync-status {
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+}
+
+.sync-ok {
+    background: var(--color-done-soft);
+    color: var(--color-done);
+}
+
+.sync-offline {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.sync-demo {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+}
+
+.sync-demo a {
+    color: inherit;
+}
+
+.sync-warn {
+    background: var(--color-alert-soft);
+    color: var(--color-alert);
+}
+
+.action-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.header-actions .btn-refresh {
+    flex: 1;
+    width: auto;
+}
+
+.btn-print {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    color: #fff;
+    flex: 0 0 auto;
+    padding: 0 18px;
+}
+
+/* --------------------------------------------------------------------------
+   Vue personne : en-tête et stats
+   -------------------------------------------------------------------------- */
+
+.person-header {
+    border-bottom: 6px solid var(--person-color, var(--color-accent));
+}
+
+.person-stats {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.btn-its-me {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px dashed rgba(255, 255, 255, 0.6);
+    color: #fff;
+    border-radius: 10px;
+    min-height: 44px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.its-me-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* --------------------------------------------------------------------------
+   Choix de la personne (page Moi)
+   -------------------------------------------------------------------------- */
+
+.person-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.person-pick {
+    min-height: 56px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--color-card);
+    border-left: 8px solid var(--person-color, var(--color-primary));
+    box-shadow: var(--shadow);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: left;
+    padding: 0 18px;
+}
+
+.person-pick:active {
+    background: var(--color-primary-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Cartes de jours
+   -------------------------------------------------------------------------- */
+
+.day-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+/* Jour J mis en avant */
+.day-card.day-wedding {
+    border: 2px solid var(--color-primary);
+    box-shadow: 0 3px 10px rgba(157, 23, 77, 0.18);
+}
+
+.day-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px;
+    min-height: 48px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.day-summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-summary-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.day-summary-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.day-date {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-soft);
+    font-weight: 700;
+}
+
+.day-title {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.day-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.badge {
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.badge-today {
+    background: var(--color-accent);
+    color: #fff;
+}
+
+.badge-wedding {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.badge-todo {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.day-body {
+    padding: 0 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.empty-day {
+    font-size: 13px;
+    color: var(--color-text-soft);
+    background: var(--color-bg);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Cartes de tâches
+   -------------------------------------------------------------------------- */
+
+.task-card {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--color-card);
+    cursor: pointer;
+}
+
+.task-card.is-done {
+    background: var(--color-done-soft);
+    border-color: #bbe5c8;
+}
+
+.task-card.is-done .task-title {
+    text-decoration: line-through;
+    color: var(--color-text-soft);
+}
+
+.task-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.task-check {
+    font-size: 17px;
+}
+
+.task-time {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 13px;
+}
+
+.is-done .task-time {
+    background: var(--color-done-soft);
+    color: var(--color-done);
+}
+
+.task-title {
+    font-weight: 700;
+    font-size: 15px;
+    flex: 1;
+    min-width: 50%;
+}
+
+.task-people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.person-badge {
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 9px;
+    white-space: nowrap;
+    color: #fff;
+    background: var(--person-color, var(--color-primary));
+}
+
+.person-badge-all {
+    background: var(--color-bg);
+    color: var(--color-text-soft);
+    border: 1px solid var(--color-border);
+}
+
+.task-notes {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--color-text-soft);
+    user-select: text;
+}
+
+/* --------------------------------------------------------------------------
+   Boutons d'action
+   -------------------------------------------------------------------------- */
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    flex: 1;
+}
+
+.btn-refresh {
+    background: var(--color-primary);
+    color: #fff;
+    flex: 0 1 auto;
+    width: 100%;
+}
+
+.btn-clear {
+    background: var(--color-bg);
+    color: var(--color-text-soft);
+    border: 1px solid var(--color-border);
+}
+
+/* --------------------------------------------------------------------------
+   Ajout / édition de tâche
+   -------------------------------------------------------------------------- */
+
+.btn-add {
+    background: var(--color-card);
+    color: var(--color-primary);
+    border: 2px dashed var(--color-primary);
+}
+
+.add-form {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: default;
+}
+
+.edit-form {
+    border: 2px solid var(--color-primary);
+}
+
+.add-form-row {
+    display: flex;
+    gap: 10px;
+}
+
+.form-time {
+    flex: 0 0 118px;
+}
+
+.form-grow {
+    flex: 1;
+}
+
+.add-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+select.form-input {
+    appearance: none;
+}
+
+/* Cases à cocher des personnes */
+.person-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.person-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 2px solid var(--person-color, var(--color-border));
+    background: var(--color-card);
+    color: var(--color-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.person-check.is-checked {
+    background: var(--person-color, var(--color-primary));
+    color: #fff;
+}
+
+.person-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: #fff;
+}
+
+.form-hint-inline {
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--color-text-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Formulaire Paramètres
+   -------------------------------------------------------------------------- */
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-label {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.form-input {
+    min-height: 48px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 15px;
+    background: var(--color-card);
+    color: var(--color-text);
+    user-select: text;
+}
+
+.form-input:focus {
+    outline: 2px solid var(--color-primary);
+    border-color: transparent;
+}
+
+.form-hint {
+    font-size: 12px;
+    color: var(--color-text-soft);
+}
+
+.show-token {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text-soft);
+}
+
+.show-token input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Suppression avec confirmation
+   -------------------------------------------------------------------------- */
+
+.btn-card-icon {
+    background: none;
+    border: none;
+    padding: 4px 6px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0.35;
+    flex-shrink: 0;
+    border-radius: 6px;
+}
+
+.btn-card-icon:active {
+    opacity: 1;
+    background: var(--color-alert-soft);
+}
+
+.delete-confirm {
+    background: var(--color-alert-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: default;
+}
+
+.delete-confirm-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-alert);
+}
+
+.delete-confirm-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-delete-yes {
+    background: var(--color-alert);
+    color: #fff;
+    flex: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Partage de journée
+   -------------------------------------------------------------------------- */
+
+.btn-share-day {
+    background: none;
+    border: none;
+    padding: 4px 6px;
+    font-size: 15px;
+    cursor: pointer;
+    opacity: 0.45;
+    flex-shrink: 0;
+    border-radius: 6px;
+}
+
+.btn-share-day:active {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* --------------------------------------------------------------------------
+   Divers : messages, version
+   -------------------------------------------------------------------------- */
+
+.loading-message,
+.empty-message {
+    text-align: center;
+    color: var(--color-text-soft);
+    padding: 40px 16px;
+}
+
+.app-version {
+    font-size: 12px;
+    margin-top: 24px;
+}
+
+.load-error {
+    text-align: center;
+    padding: 40px 16px;
+}
+
+.error-detail {
+    font-size: 12px;
+    color: var(--color-text-soft);
+    word-break: break-word;
+}
+
+/* --------------------------------------------------------------------------
+   Écran de chargement Blazor (repris du template)
+   -------------------------------------------------------------------------- */
+
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    margin: 20vh auto 1rem auto;
+}
+
+.loading-progress circle {
+    fill: none;
+    stroke: #e2d6dd;
+    stroke-width: 0.6rem;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+    stroke: var(--color-primary);
+    stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+    transition: stroke-dasharray 0.05s ease-in-out;
+}
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+}
+
+.loading-progress-text:after {
+    content: var(--blazor-load-percentage-text, "Chargement");
+}
+
+#blazor-error-ui {
+    background: var(--color-accent-soft);
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 200;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Export PDF — impression
+   -------------------------------------------------------------------------- */
+
+@media print {
+    /* Éléments interactifs masqués */
+    .no-print,
+    .bottom-nav,
+    .sync-status,
+    .btn-card-icon,
+    .btn-add,
+    .btn-share-day,
+    .btn-its-me,
+    .its-me-hint,
+    .delete-confirm,
+    .add-form { display: none !important; }
+
+    /* Mise en page */
+    html, body { background: #fff; }
+
+    .app-content {
+        padding: 8px;
+        max-width: 100%;
+        padding-bottom: 8px;
+    }
+
+    /* En-tête : force les couleurs */
+    .page-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    /* Badges personnes : force les couleurs */
+    .person-badge {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Cartes de jours : ouvrir le contenu même si <details> est fermé */
+    details.day-card > .day-body {
+        display: flex !important;
+    }
+
+    .day-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 6px;
+        border-radius: 4px;
+    }
+
+    .task-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}

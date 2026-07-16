@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # L'app est servie sous /mariage-planning/ : le base href doit être modifié
+      # AVANT le publish pour que les hash du Service Worker restent valides.
+      - name: Ajuster le base href
+        run: sed -i 's|<base href="/" />|<base href="/mariage-planning/" />|' MariagePlanning/wwwroot/index.html
+
+      - name: Publish
+        run: dotnet publish MariagePlanning/MariagePlanning.csproj -c Release -o publish
+
+      - name: Préparer pour Pages (.nojekyll + fallback SPA)
+        run: |
+          touch publish/wwwroot/.nojekyll
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

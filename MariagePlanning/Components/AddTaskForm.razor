@@ -1,0 +1,149 @@
+@inject WeddingStore Store
+
+@if (!_open)
+{
+    <button class="action-btn btn-add" @onclick="OpenAsync">➕ Ajouter une tâche</button>
+    @if (_hint is not null)
+    {
+        <div class="sync-status sync-warn">@_hint</div>
+    }
+}
+else
+{
+    <div class="add-form">
+        <div class="add-form-row">
+            <label class="form-field form-time">
+                <span class="form-label">Heure</span>
+                <input class="form-input" type="time" @bind="_time" />
+            </label>
+            <label class="form-field form-grow">
+                <span class="form-label">Titre *</span>
+                <input class="form-input" type="text" @bind="_title" placeholder="ex : Récupérer les fleurs" />
+            </label>
+        </div>
+
+        <label class="form-field">
+            <span class="form-label">Notes</span>
+            <input class="form-input" type="text" @bind="_notes" placeholder="ex : Camionnette de Bernard" />
+        </label>
+
+        <div class="form-field">
+            <span class="form-label">Qui ? <span class="form-hint-inline">(personne cochée = tout le monde)</span></span>
+            <div class="person-checks">
+                @foreach (var person in Store.Data?.People ?? [])
+                {
+                    <label class="person-check @(_assigned.Contains(person.Id) ? "is-checked" : "")"
+                           style="--person-color: @person.Color">
+                        <input type="checkbox"
+                               checked="@_assigned.Contains(person.Id)"
+                               @onchange="e => ToggleAssigned(person.Id, e)" />
+                        @person.Name
+                    </label>
+                }
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="sync-status sync-warn">⚠️ @_error</div>
+        }
+
+        <div class="add-form-actions">
+            <button class="action-btn btn-clear" @onclick="Close" disabled="@_busy">Annuler</button>
+            <button class="action-btn btn-refresh" @onclick="SaveAsync" disabled="@(_busy || string.IsNullOrWhiteSpace(_title))">
+                @(_busy ? "⏳ Sauvegarde…" : "💾 Enregistrer")
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public DateOnly Date { get; set; }
+
+    private bool _open;
+    private bool _busy;
+    private string? _error;
+    private string? _hint;
+
+    private TimeOnly? _time;
+    private string? _title;
+    private string? _notes;
+    private HashSet<string> _assigned = [];
+
+    private async Task OpenAsync()
+    {
+        _hint = null;
+
+        if (!Store.CanEdit)
+        {
+            _hint = "✏️ Édition indisponible : configure le Gist et le token dans Paramètres.";
+            return;
+        }
+        if (!await Store.IsOnlineAsync())
+        {
+            _hint = "📵 Modification impossible hors connexion.";
+            return;
+        }
+        _open = true;
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _error = null;
+    }
+
+    private void ToggleAssigned(string personId, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+            _assigned.Add(personId);
+        else
+            _assigned.Remove(personId);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+
+        var task = new TaskItem
+        {
+            Id = $"t-{Guid.NewGuid():N}"[..14],
+            Time = _time?.ToString("HH:mm"),
+            Title = _title!.Trim(),
+            Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+            AssignedTo = _assigned.ToList(),
+            Status = "todo"
+        };
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == Date);
+            if (day is null)
+                return false;
+
+            day.Activities.Add(task);
+            day.Activities = day.Activities
+                .OrderBy(a => a.Time is not null)
+                .ThenBy(a => a.Time, StringComparer.Ordinal)
+                .ToList();
+            return true;
+        });
+
+        _busy = false;
+
+        if (ok)
+        {
+            _open = false;
+            _time = null;
+            _title = null;
+            _notes = null;
+            _assigned = [];
+        }
+        else
+        {
+            _error = error;
+        }
+    }
+}
