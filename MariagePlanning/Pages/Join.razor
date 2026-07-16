@@ -1,0 +1,115 @@
+@page "/rejoindre"
+@inject SettingsService Config
+@inject WeddingStore Store
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Mariage Planning — Rejoindre</PageTitle>
+
+<header class="page-header">
+    <h1>🔑 Rejoindre le planning</h1>
+    <div class="wedding-sub">Entre le mot de passe du groupe pour configurer l'app.</div>
+</header>
+
+@if (_blob is null)
+{
+    <div class="load-error">
+        <p>⚠️ Ce lien est incomplet — il manque la configuration chiffrée.</p>
+        <p class="error-detail">Demande un nouveau lien (ou re-scanne le QR code) à la personne qui gère le planning.</p>
+        <a class="action-btn btn-refresh" href="">Retour au planning</a>
+    </div>
+}
+else if (_done)
+{
+    <div class="settings-form">
+        <div class="sync-status sync-ok">✅ Configuration installée — @( _dayCount ) jour(s) chargé(s).</div>
+        <a class="action-btn btn-refresh" href="moi">👤 Choisir qui je suis</a>
+        <a class="action-btn btn-clear" href="">📋 Voir tout le planning</a>
+    </div>
+}
+else
+{
+    <div class="settings-form">
+        <label class="form-field">
+            <span class="form-label">Mot de passe</span>
+            <input class="form-input" type="password" @bind="_password" @bind:event="oninput"
+                   placeholder="Le mot de passe partagé du groupe"
+                   autocapitalize="off" autocorrect="off" spellcheck="false" />
+        </label>
+
+        <button class="action-btn btn-refresh" @onclick="UnlockAsync"
+                disabled="@(_busy || string.IsNullOrWhiteSpace(_password))">
+            @(_busy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
+        </button>
+
+        @if (_error is not null)
+        {
+            <div class="sync-status sync-warn">⚠️ @_error</div>
+        }
+    </div>
+}
+
+@code {
+    private string? _blob;
+    private string? _password;
+    private bool _busy;
+    private bool _done;
+    private string? _error;
+    private int _dayCount;
+
+    private class SharedConfig
+    {
+        public string? GistId { get; set; }
+        public string? Token { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        // La config chiffrée voyage dans le fragment (#...) : jamais envoyée au serveur.
+        var uri = new Uri(Nav.Uri);
+        _blob = uri.Fragment.Length > 1 ? uri.Fragment[1..] : null;
+    }
+
+    private async Task UnlockAsync()
+    {
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var json = await JS.InvokeAsync<string>("mariage.decryptConfig", _password, _blob);
+            var config = JsonSerializer.Deserialize<SharedConfig>(json, GistService.JsonOpts);
+
+            if (string.IsNullOrWhiteSpace(config?.GistId))
+            {
+                _error = "Lien invalide — la configuration déchiffrée est vide.";
+                return;
+            }
+
+            await Config.SaveAsync(config.GistId, config.Token);
+            await Store.ReloadAsync();
+
+            if (Store.Source == DataSource.Gist)
+            {
+                _dayCount = Store.Data?.Days.Count ?? 0;
+                _done = true;
+            }
+            else
+            {
+                _error = $"Configuration installée mais connexion impossible : {Store.LoadError ?? "vérifie le réseau"}";
+            }
+        }
+        catch (JSException)
+        {
+            _error = "Mot de passe incorrect (ou lien abîmé) — réessaie.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

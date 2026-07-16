@@ -1,6 +1,8 @@
 @page "/parametres"
 @inject SettingsService Config
 @inject WeddingStore Store
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — Paramètres</PageTitle>
 
@@ -47,6 +49,42 @@
                     <option value="@person.Id">@person.Name</option>
                 }
             </select>
+        </div>
+    }
+
+    @if (Config.CanSave)
+    {
+        <div class="share-config">
+            <h2 class="share-config-title">📲 Partager la configuration</h2>
+            <p class="form-hint">
+                Génère un lien (et son QR code) contenant le Gist + le token, chiffrés avec un
+                mot de passe. La personne qui l'ouvre entre le mot de passe et l'app se configure toute seule.
+            </p>
+
+            <label class="form-field">
+                <span class="form-label">Mot de passe du groupe</span>
+                <input class="form-input" type="text" @bind="_sharePassword" @bind:event="oninput"
+                       placeholder="ex : le nom du chat de Bénédicte" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            </label>
+
+            <button class="action-btn btn-refresh" @onclick="GenerateShareAsync"
+                    disabled="@(_shareBusy || string.IsNullOrWhiteSpace(_sharePassword))">
+                @(_shareBusy ? "⏳ Chiffrement…" : "🔗 Générer le lien à partager")
+            </button>
+
+            @if (_shareUrl is not null)
+            {
+                <div id="share-qr" class="share-qr"></div>
+                <div class="share-url">@_shareUrl</div>
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CopyShareUrlAsync">📋 Copier</button>
+                    <button class="action-btn btn-refresh" @onclick="ShareUrlAsync">📤 Partager</button>
+                </div>
+                @if (_shareCopied)
+                {
+                    <div class="sync-status sync-ok">✅ Lien copié.</div>
+                }
+            }
         </div>
     }
 
@@ -103,6 +141,46 @@
 
     private async Task OnPersonChangedAsync(ChangeEventArgs e) =>
         await Config.SetCurrentPersonAsync(e.Value?.ToString());
+
+    // --- Partage de la configuration (URL chiffrée + QR code) ---
+
+    private string? _sharePassword;
+    private string? _shareUrl;
+    private bool _shareBusy;
+    private bool _shareCopied;
+
+    private async Task GenerateShareAsync()
+    {
+        _shareBusy = true;
+        _shareCopied = false;
+
+        var payload = JsonSerializer.Serialize(
+            new { gistId = Config.GistId, token = Config.Token }, GistService.JsonOpts);
+        var blob = await JS.InvokeAsync<string>("mariage.encryptConfig", _sharePassword, payload);
+
+        // Le blob voyage dans le fragment (#...) : il n'atteint jamais le serveur.
+        _shareUrl = $"{Nav.BaseUri}rejoindre#{blob}";
+        _shareBusy = false;
+
+        StateHasChanged();
+        await Task.Yield(); // laisse Blazor rendre le conteneur #share-qr avant d'y dessiner
+        await JS.InvokeVoidAsync("mariage.makeQr", "share-qr", _shareUrl);
+    }
+
+    private async Task CopyShareUrlAsync()
+    {
+        await JS.InvokeVoidAsync("mariage.copyText", _shareUrl);
+        _shareCopied = true;
+    }
+
+    private async Task ShareUrlAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mariage.shareText", _shareUrl);
+        }
+        catch { /* share non supporté ou annulé */ }
+    }
 
     private async Task ClearAsync()
     {
