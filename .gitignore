@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Vrai planning (adresses perso) : vit dans le Gist secret, jamais dans ce repo public
+/mariage.json
+
 # User-specific files
 *.rsuser
 *.suo
