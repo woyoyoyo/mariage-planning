@@ -6,5 +6,5 @@ namespace MariagePlanning.Services;
 /// </summary>
 public static class AppInfo
 {
-    public const string Version = "1.9.0 💍";
+    public const string Version = "2.0.0 💍";
 }

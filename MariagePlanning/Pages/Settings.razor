@@ -387,6 +387,10 @@
         </div>
     </details>
 
+    <button class="action-btn btn-hard-refresh" @onclick="HardRefreshAsync" disabled="@_busy">
+        🔄 Forcer la mise à jour de l'app
+    </button>
+
     <div class="actions-footer">
         @if (Config.CanSave)
         {
@@ -754,6 +758,12 @@
         await Store.ReloadAsync();
         _feedback = "🔒 Déconnecté — entre le mot de passe pour réactiver la modification.";
         _feedbackClass = "sync-readonly";
+    }
+
+    private async Task HardRefreshAsync()
+    {
+        _busy = true;
+        await JS.InvokeVoidAsync("mariage.hardRefresh");
     }
 
     private async Task ClearAsync()

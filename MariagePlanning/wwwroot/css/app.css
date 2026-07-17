@@ -970,6 +970,13 @@ select.form-input {
     flex: 1;
 }
 
+.btn-hard-refresh {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    border: 1px solid var(--color-accent);
+    width: 100%;
+}
+
 .actions-footer {
     display: flex;
     gap: 8px;
@@ -1171,6 +1178,336 @@ select.form-input {
     font-size: 12px;
     color: var(--color-text-soft);
     margin-left: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Agenda — en-tête compact de la page d'accueil
+   -------------------------------------------------------------------------- */
+
+.agenda-header {
+    background: var(--header-grad);
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 14px 16px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: var(--shadow);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.agenda-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.agenda-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.agenda-countdown {
+    font-size: 13px;
+    font-weight: 800;
+    background: rgba(255,255,255,0.22);
+    border-radius: 20px;
+    padding: 4px 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.agenda-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.agenda-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    min-height: 36px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.agenda-btn:active { background: rgba(255,255,255,0.3); }
+.agenda-btn:disabled { opacity: 0.5; cursor: default; }
+
+.agenda-btn-person {
+    background: var(--person-color, rgba(255,255,255,0.16));
+    border-color: rgba(255,255,255,0.5);
+}
+
+.agenda-btn-active {
+    background: rgba(255,255,255,0.9);
+    color: var(--color-primary);
+    border-color: transparent;
+    font-weight: 700;
+}
+
+.agenda-status-row {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.agenda-status-warn { color: #fde68a; }
+
+/* --------------------------------------------------------------------------
+   Dashboard — grille de tuiles (style Windows Phone / Metro)
+   -------------------------------------------------------------------------- */
+
+.tile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+/* Base tile */
+.tile {
+    border-radius: var(--radius);
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 100px;
+    text-decoration: none;
+    border: none;
+    font-family: inherit;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+}
+
+a.tile, button.tile { cursor: pointer; }
+a.tile:active, button.tile:active:not(:disabled) { opacity: 0.80; }
+button.tile:disabled { opacity: 0.45; }
+
+.tile-full { grid-column: 1 / -1; }
+
+/* Typography */
+.tile-big-num {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 1px;
+}
+
+.tile-unit {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.tile-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.65;
+    margin-top: auto;
+}
+
+.tile-sub {
+    font-size: 12px;
+    opacity: 0.82;
+    line-height: 1.3;
+}
+
+.tile-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+}
+
+.tile-icon-lg {
+    font-size: 26px;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+
+/* Tile héro (compte à rebours) */
+.tile-hero {
+    background: var(--header-grad);
+    color: #fff;
+    min-height: 130px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.tile-hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.tile-hero-name {
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.tile-hero-badge {
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+.tile-badge-ok   { background: rgba(255,255,255,0.22); }
+.tile-badge-warn { background: rgba(255,200,0,0.3); }
+.tile-badge-demo { background: rgba(255,255,255,0.14); }
+
+.tile-countdown {
+    font-size: 60px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+
+.tile-countdown-label {
+    font-size: 13px;
+    opacity: 0.85;
+    margin-top: 4px;
+}
+
+/* Tile accent (avancement) */
+.tile-accent {
+    background: var(--color-accent);
+    color: #fff;
+}
+
+/* Tile personne */
+.tile-person {
+    background: var(--person-color, var(--color-primary));
+    color: #fff;
+}
+
+/* Tile prochaine tâche */
+.tile-next {
+    background: #1e293b;
+    color: #fff;
+    min-height: 82px;
+}
+
+.tile-next-title {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 4px 0 2px;
+}
+
+.tile-next-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.tile-next-hint {
+    background: #1e293b;
+    color: rgba(255,255,255,0.75);
+    min-height: 72px;
+}
+
+/* Tiles par jour */
+.tile-day {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    min-height: 88px;
+}
+
+.tile-wedding {
+    background: var(--header-grad);
+    color: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.tile-today {
+    background: #fef3c7;
+    border: 2px solid var(--color-accent);
+    color: var(--color-text);
+}
+
+.tile-day-num {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+/* Mini barre de progression dans chaque jour */
+.tile-progress-mini {
+    height: 3px;
+    background: rgba(0,0,0,0.12);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.tile-wedding .tile-progress-mini { background: rgba(255,255,255,0.25); }
+
+.tile-progress-fill {
+    height: 100%;
+    background: currentColor;
+    opacity: 0.6;
+    border-radius: 2px;
+    min-width: 4px;
+    transition: width 0.3s ease;
+}
+
+/* Tiles stats (personnes, contacts) */
+.tile-muted {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-soft);
+}
+
+/* Tiles action (actualiser, PDF) */
+.tile-action {
+    background: var(--color-card);
+    border: 1.5px dashed var(--color-border);
+    color: var(--color-text-soft);
+    min-height: 72px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Tile ajouter un jour */
+.tile-add-day {
+    background: transparent;
+    border: 2px dashed var(--color-primary);
+    color: var(--color-primary);
+    min-height: 64px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -1562,6 +1899,11 @@ select.form-input {
     color: var(--color-done);
 }
 
+.badge-mine {
+    background: var(--color-primary);
+    color: #fff;
+}
+
 /* --------------------------------------------------------------------------
    Page jour — topbar + entête + gestion
    -------------------------------------------------------------------------- */
@@ -1838,6 +2180,12 @@ select.form-input {
         word-break: break-all;
         max-width: 300px;
     }
+
+    /* Tuiles */
+    .tile-grid { gap: 6px; }
+    .tile { -webkit-print-color-adjust: exact; print-color-adjust: exact; min-height: 0; padding: 10px 12px; }
+    .tile-countdown { font-size: 40px; }
+    .tile-action, .tile-add-day { display: none !important; }
 
     /* Mise en page */
     html, body { background: #fff; }

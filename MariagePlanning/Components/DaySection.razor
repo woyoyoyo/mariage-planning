@@ -1,7 +1,7 @@
 @inject WeddingStore Store
 @inject IJSRuntime JS
 
-<details class="day-card @(IsWeddingDay ? "day-wedding" : "")" id="day-@Day.Date.ToString("yyyy-MM-dd")">
+<details class="day-card @(IsWeddingDay ? "day-wedding" : "")" id="day-@Day.Date.ToString("yyyy-MM-dd")" open="@InitiallyOpen">
     <summary class="day-summary">
         <div class="day-summary-main">
             <div class="day-summary-text">
@@ -18,7 +18,11 @@
             {
                 <span class="badge badge-today">Aujourd'hui</span>
             }
-            @if (TodoCount > 0)
+            @if (PersonId is not null && MyStrictCount > 0)
+            {
+                <span class="badge badge-mine">@MyStrictCount moi</span>
+            }
+            @if (PersonId is null && TodoCount > 0)
             {
                 <span class="badge badge-todo">@DoneCount/@(TodoCount + DoneCount)</span>
             }
@@ -82,13 +86,27 @@
     [Parameter]
     public string? PersonId { get; set; }
 
+    /// <summary>Ouvre le panneau au chargement (aujourd'hui et jours futurs).</summary>
+    [Parameter]
+    public bool InitiallyOpen { get; set; }
+
+    /// <summary>Quand true, n'affiche que les tâches explicitement assignées à PersonId (exclut "tout le monde").</summary>
+    [Parameter]
+    public bool StrictFilter { get; set; }
+
     private bool IsToday => Day.Date == DateOnly.FromDateTime(DateTime.Now);
     private bool IsWeddingDay => Store.IsWeddingDay(Day);
 
     private IEnumerable<TaskItem> FilteredTasks =>
-        PersonId is null
-            ? Day.Activities
+        PersonId is null ? Day.Activities
+        : StrictFilter
+            ? Day.Activities.Where(t => t.AssignedTo.Contains(PersonId))
             : Day.Activities.Where(t => WeddingStore.ConcernsPerson(t, PersonId));
+
+    /// <summary>Tâches explicitement assignées à moi (exclut "tout le monde") — pour le badge.</summary>
+    private int MyStrictCount =>
+        PersonId is null ? 0
+        : Day.Activities.Count(t => t.AssignedTo.Contains(PersonId));
 
     private IEnumerable<TaskItem> UntimedTasks =>
         FilteredTasks.Where(t => t.Time is null);
