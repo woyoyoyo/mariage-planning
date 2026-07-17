@@ -1,0 +1,384 @@
+@page "/personnes"
+@inject WeddingStore Store
+@inject SettingsService Config
+
+<PageTitle>Mariage Planning — Personnes & Équipes</PageTitle>
+
+<header class="page-header">
+    <h1>👥 Personnes & Équipes</h1>
+</header>
+
+@if (Store.Data is null)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else if (!Store.CanEdit)
+{
+    <div class="sync-status sync-readonly">👁️ Mode lecture seule — gestion des personnes réservée aux organisateurs.</div>
+}
+else
+{
+    <div class="settings-form">
+
+        @* ── Personnes ──────────────────────────────────────────────────── *@
+        <div class="share-config">
+            <h2 class="share-config-title">👤 Personnes</h2>
+
+            <div class="people-list">
+                @foreach (var person in Store.Data.People)
+                {
+                    var pid = person.Id;
+                    <div class="people-group">
+                        <div class="people-row">
+                            <span class="person-badge" style="--person-color: @person.Color">@person.Name</span>
+                            <div class="people-row-actions">
+                                <button class="btn-card-icon" @onclick="() => StartEditPerson(person)"
+                                        title="Modifier @person.Name">✏️</button>
+                                <button class="btn-card-icon people-delete"
+                                        @onclick="() => DeletePersonAsync(pid)"
+                                        disabled="@(_personBusy || _editingPersonId == pid)"
+                                        title="Supprimer @person.Name">🗑️</button>
+                            </div>
+                        </div>
+                        @if (_editingPersonId == pid)
+                        {
+                            <div class="add-form edit-form">
+                                <div class="add-form-row">
+                                    <label class="form-field form-grow">
+                                        <span class="form-label">Prénom *</span>
+                                        <input class="form-input" type="text" @bind="_epName" autocapitalize="words" />
+                                    </label>
+                                    <label class="form-field">
+                                        <span class="form-label">Couleur</span>
+                                        <input type="color" class="color-picker" @bind="_epColor" />
+                                    </label>
+                                </div>
+                                <label class="form-field">
+                                    <span class="form-label">📞 Téléphone</span>
+                                    <input class="form-input" type="tel" @bind="_epPhone" placeholder="+33 6 12 34 56 78" />
+                                </label>
+                                <label class="form-field">
+                                    <span class="form-label">📍 Adresse</span>
+                                    <input class="form-input" type="text" @bind="_epAddress"
+                                           placeholder="ex : 12 rue du Château, 69400 Anse" />
+                                </label>
+                                @if (_epError is not null) { <div class="sync-status sync-warn">⚠️ @_epError</div> }
+                                <div class="add-form-actions">
+                                    <button class="action-btn btn-clear" @onclick="() => _editingPersonId = null">Annuler</button>
+                                    <button class="action-btn btn-refresh" @onclick="SavePersonEditAsync"
+                                            disabled="@(_epBusy || string.IsNullOrWhiteSpace(_epName))">
+                                        @(_epBusy ? "⏳…" : "💾 Enregistrer")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (_addingPerson)
+            {
+                <div class="add-form">
+                    <div class="add-form-row">
+                        <label class="form-field form-grow">
+                            <span class="form-label">Prénom *</span>
+                            <input class="form-input" type="text" @bind="_newPersonName"
+                                   placeholder="ex : Marie" autocapitalize="words" autocorrect="off" />
+                        </label>
+                        <label class="form-field">
+                            <span class="form-label">Couleur</span>
+                            <input type="color" class="color-picker" @bind="_newPersonColor" />
+                        </label>
+                    </div>
+                    <label class="form-field">
+                        <span class="form-label">📞 Téléphone</span>
+                        <input class="form-input" type="tel" @bind="_newPersonPhone" placeholder="+33 6 12 34 56 78" />
+                    </label>
+                    <label class="form-field">
+                        <span class="form-label">📍 Adresse</span>
+                        <input class="form-input" type="text" @bind="_newPersonAddress"
+                               placeholder="ex : 12 rue du Château, 69400 Anse" />
+                    </label>
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _addingPerson = false">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="AddPersonAsync"
+                                disabled="@(_personBusy || string.IsNullOrWhiteSpace(_newPersonName))">
+                            @(_personBusy ? "⏳…" : "➕ Ajouter")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button class="action-btn btn-add" @onclick="() => { _addingPerson = true; _editingPersonId = null; }">
+                    ➕ Ajouter une personne
+                </button>
+            }
+
+            @if (_personError is not null)
+            {
+                <div class="sync-status sync-warn">⚠️ @_personError</div>
+            }
+        </div>
+
+        @* ── Équipes ─────────────────────────────────────────────────────── *@
+        <div class="share-config">
+            <h2 class="share-config-title">👨‍👩‍👧 Équipes</h2>
+            <p class="form-hint">Raccourcis pour assigner plusieurs personnes d'un seul clic.</p>
+
+            <div class="people-list">
+                @foreach (var team in Store.Data.Teams)
+                {
+                    var tid = team.Id;
+                    var members = team.MemberIds
+                        .Select(mid => Store.PersonById(mid)?.Name)
+                        .Where(n => n is not null).ToList();
+                    <div class="people-group">
+                        <div class="people-row">
+                            <div>
+                                <span class="person-badge" style="--person-color: @team.Color">@team.Name</span>
+                                <span class="team-member-count">@(members.Count == 0 ? "vide" : string.Join(", ", members))</span>
+                            </div>
+                            <div class="people-row-actions">
+                                <button class="btn-card-icon" @onclick="() => StartEditTeam(team)">✏️</button>
+                                <button class="btn-card-icon people-delete" @onclick="() => DeleteTeamAsync(tid)"
+                                        disabled="@(_teamBusy || _editingTeamId == tid)">🗑️</button>
+                            </div>
+                        </div>
+                        @if (_editingTeamId == tid)
+                        {
+                            <div class="add-form edit-form">
+                                <div class="add-form-row">
+                                    <label class="form-field form-grow">
+                                        <span class="form-label">Nom *</span>
+                                        <input class="form-input" type="text" @bind="_etName" autocapitalize="words" />
+                                    </label>
+                                    <label class="form-field">
+                                        <span class="form-label">Couleur</span>
+                                        <input type="color" class="color-picker" @bind="_etColor" />
+                                    </label>
+                                </div>
+                                <div class="form-field">
+                                    <span class="form-label">Membres</span>
+                                    <div class="person-checks">
+                                        @foreach (var p in Store.Data.People)
+                                        {
+                                            <label class="person-check @(_etMembers.Contains(p.Id) ? "is-checked" : "")"
+                                                   style="--person-color: @p.Color">
+                                                <input type="checkbox" checked="@_etMembers.Contains(p.Id)"
+                                                       @onchange="e => ToggleTeamMember(p.Id, e)" />
+                                                @p.Name
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                                @if (_teamError is not null) { <div class="sync-status sync-warn">⚠️ @_teamError</div> }
+                                <div class="add-form-actions">
+                                    <button class="action-btn btn-clear" @onclick="() => _editingTeamId = null">Annuler</button>
+                                    <button class="action-btn btn-refresh" @onclick="SaveTeamEditAsync"
+                                            disabled="@(_teamBusy || string.IsNullOrWhiteSpace(_etName))">
+                                        @(_teamBusy ? "⏳…" : "💾 Enregistrer")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (_addingTeam)
+            {
+                <div class="add-form">
+                    <div class="add-form-row">
+                        <label class="form-field form-grow">
+                            <span class="form-label">Nom *</span>
+                            <input class="form-input" type="text" @bind="_etName" placeholder="ex : Équipe déco"
+                                   autocapitalize="words" />
+                        </label>
+                        <label class="form-field">
+                            <span class="form-label">Couleur</span>
+                            <input type="color" class="color-picker" @bind="_etColor" />
+                        </label>
+                    </div>
+                    <div class="form-field">
+                        <span class="form-label">Membres</span>
+                        <div class="person-checks">
+                            @foreach (var p in Store.Data.People)
+                            {
+                                <label class="person-check @(_etMembers.Contains(p.Id) ? "is-checked" : "")"
+                                       style="--person-color: @p.Color">
+                                    <input type="checkbox" checked="@_etMembers.Contains(p.Id)"
+                                           @onchange="e => ToggleTeamMember(p.Id, e)" />
+                                    @p.Name
+                                </label>
+                            }
+                        </div>
+                    </div>
+                    @if (_teamError is not null) { <div class="sync-status sync-warn">⚠️ @_teamError</div> }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear"
+                                @onclick="() => { _addingTeam = false; _etName = null; _etMembers = []; }">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="AddTeamAsync"
+                                disabled="@(_teamBusy || string.IsNullOrWhiteSpace(_etName))">
+                            @(_teamBusy ? "⏳…" : "➕ Créer l'équipe")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button class="action-btn btn-add"
+                        @onclick="() => { _addingTeam = true; _editingTeamId = null; }">
+                    ➕ Ajouter une équipe
+                </button>
+            }
+        </div>
+
+    </div>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await Config.EnsureLoadedAsync();
+        await Store.EnsureLoadedAsync();
+    }
+
+    // ── Personnes ────────────────────────────────────────────────────────────
+
+    private bool    _addingPerson;
+    private string? _newPersonName;
+    private string  _newPersonColor = "#6366f1";
+    private string? _newPersonPhone;
+    private string? _newPersonAddress;
+    private bool    _personBusy;
+    private string? _personError;
+
+    private string? _editingPersonId;
+    private string? _epName;
+    private string  _epColor = "#6366f1";
+    private string? _epPhone;
+    private string? _epAddress;
+    private bool    _epBusy;
+    private string? _epError;
+
+    private void StartEditPerson(Person person)
+    {
+        _editingPersonId = person.Id;
+        _epName    = person.Name;
+        _epColor   = person.Color;
+        _epPhone   = person.Phone;
+        _epAddress = person.Address;
+        _epError   = null;
+        _addingPerson = false;
+    }
+
+    private async Task SavePersonEditAsync()
+    {
+        _epBusy = true; _epError = null;
+        var pid = _editingPersonId!;
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var p = data.People.FirstOrDefault(p => p.Id == pid);
+            if (p is null) return false;
+            p.Name = _epName!.Trim(); p.Color = _epColor;
+            p.Phone   = string.IsNullOrWhiteSpace(_epPhone)   ? null : _epPhone.Trim();
+            p.Address = string.IsNullOrWhiteSpace(_epAddress) ? null : _epAddress.Trim();
+            return true;
+        });
+        _epBusy = false;
+        if (ok) _editingPersonId = null; else _epError = error;
+    }
+
+    private async Task AddPersonAsync()
+    {
+        _personBusy = true; _personError = null;
+        var id = Guid.NewGuid().ToString("N")[..8];
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.People.Add(new Person
+            {
+                Id = id, Name = _newPersonName!.Trim(), Color = _newPersonColor,
+                Phone   = string.IsNullOrWhiteSpace(_newPersonPhone)   ? null : _newPersonPhone.Trim(),
+                Address = string.IsNullOrWhiteSpace(_newPersonAddress) ? null : _newPersonAddress.Trim()
+            });
+            return true;
+        });
+        _personBusy = false;
+        if (ok) { _newPersonName = null; _newPersonColor = "#6366f1"; _newPersonPhone = null; _newPersonAddress = null; _addingPerson = false; }
+        else _personError = error;
+    }
+
+    private async Task DeletePersonAsync(string personId)
+    {
+        _personBusy = true; _personError = null;
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.People.RemoveAll(p => p.Id == personId);
+            foreach (var day in data.Days) foreach (var t in day.Activities) t.AssignedTo.Remove(personId);
+            foreach (var team in data.Teams) team.MemberIds.Remove(personId);
+            return true;
+        });
+        if (ok && Config.CurrentPerson == personId) await Config.SetCurrentPersonAsync(null);
+        _personBusy = false;
+        if (!ok) _personError = error;
+    }
+
+    // ── Équipes ──────────────────────────────────────────────────────────────
+
+    private bool    _addingTeam;
+    private string? _editingTeamId;
+    private string? _etName;
+    private string  _etColor = "#94a3b8";
+    private HashSet<string> _etMembers = [];
+    private bool    _teamBusy;
+    private string? _teamError;
+
+    private void StartEditTeam(Team team)
+    {
+        _editingTeamId = team.Id; _etName = team.Name; _etColor = team.Color;
+        _etMembers = [.. team.MemberIds]; _teamError = null; _addingTeam = false;
+    }
+
+    private void ToggleTeamMember(string personId, ChangeEventArgs e)
+    {
+        if (e.Value is true) _etMembers.Add(personId); else _etMembers.Remove(personId);
+    }
+
+    private async Task AddTeamAsync()
+    {
+        _teamBusy = true; _teamError = null;
+        var id = Guid.NewGuid().ToString("N")[..8];
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            data.Teams.Add(new Team { Id = id, Name = _etName!.Trim(), Color = _etColor, MemberIds = _etMembers.ToList() });
+            return true;
+        });
+        _teamBusy = false;
+        if (ok) { _addingTeam = false; _etName = null; _etColor = "#94a3b8"; _etMembers = []; }
+        else _teamError = error;
+    }
+
+    private async Task SaveTeamEditAsync()
+    {
+        _teamBusy = true; _teamError = null;
+        var tid = _editingTeamId!;
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var t = data.Teams.FirstOrDefault(t => t.Id == tid);
+            if (t is null) return false;
+            t.Name = _etName!.Trim(); t.Color = _etColor; t.MemberIds = _etMembers.ToList();
+            return true;
+        });
+        _teamBusy = false;
+        if (ok) _editingTeamId = null; else _teamError = error;
+    }
+
+    private async Task DeleteTeamAsync(string teamId)
+    {
+        _teamBusy = true; _teamError = null;
+        var (ok, error) = await Store.SaveAsync(data => { data.Teams.RemoveAll(t => t.Id == teamId); return true; });
+        _teamBusy = false;
+        if (!ok) _teamError = error;
+    }
+}

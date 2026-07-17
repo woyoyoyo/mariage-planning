@@ -46,6 +46,43 @@ else
                 </div>
             }
 
+            @* Carte de confirmation avant sauvegarde *@
+            @if (_pendingAction is not null)
+            {
+                <div class="chat-row chat-row-ai">
+                    <div class="chat-avatar">🤖</div>
+                    <div class="chat-confirm-card">
+                        <div class="chat-confirm-title">📋 Confirmer l'ajout ?</div>
+                        <div class="chat-confirm-field"><b>Tâche</b> : @_pendingAction.Title</div>
+                        <div class="chat-confirm-field"><b>Jour</b> : @_pendingDayLabel</div>
+                        @if (_pendingAction.Time is not null && _pendingAction.Time != "null")
+                        {
+                            <div class="chat-confirm-field"><b>Heure</b> : @_pendingAction.Time</div>
+                        }
+                        @if (_pendingWho is not null)
+                        {
+                            <div class="chat-confirm-field"><b>Pour</b> : @_pendingWho</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_pendingAction.Location) && _pendingAction.Location != "null")
+                        {
+                            <div class="chat-confirm-field"><b>Lieu</b> : @_pendingAction.Location</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_pendingAction.Notes) && _pendingAction.Notes != "null")
+                        {
+                            <div class="chat-confirm-field"><b>Notes</b> : @_pendingAction.Notes</div>
+                        }
+                        <div class="chat-confirm-actions">
+                            <button class="chat-confirm-ok" @onclick="ConfirmActionAsync" disabled="@_confirmBusy">
+                                @(_confirmBusy ? "⏳…" : "✅ Confirmer")
+                            </button>
+                            <button class="chat-confirm-cancel" @onclick="CancelAction" disabled="@_confirmBusy">
+                                ❌ Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
             @if (_thinking)
             {
                 <div class="chat-row chat-row-ai">
@@ -94,6 +131,12 @@ else
     private DotNetObjectReference<Assistant>? _dotnetRef;
     private ElementReference _msgContainer;
     private ElementReference _inputRef;
+
+    // Confirmation avant sauvegarde
+    private AssistantAction? _pendingAction;
+    private string?          _pendingDayLabel;
+    private string?          _pendingWho;
+    private bool             _confirmBusy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,9 +196,9 @@ else
             if (!string.IsNullOrWhiteSpace(displayText))
                 _messages.Add(new ChatMessage(displayText, IsUser: false));
 
-            // Exécute l'action si présente
+            // Mettre l'action en attente de confirmation
             if (action is not null && action.Action == "add_task")
-                await ExecuteAddTaskAsync(action);
+                PrepareConfirmation(action);
         }
         catch (Exception ex)
         {
@@ -167,6 +210,50 @@ else
             StateHasChanged();
             await ScrollToBottomAsync();
         }
+    }
+
+    private void PrepareConfirmation(AssistantAction action)
+    {
+        _pendingAction = action;
+
+        // Libellé du jour
+        if (DateOnly.TryParse(action.Date, out var date))
+        {
+            var day = Store.Data?.Days.FirstOrDefault(d => d.Date == date);
+            _pendingDayLabel = day is not null
+                ? $"{date:d MMMM} — {day.Label}"
+                : date.ToString("d MMMM");
+        }
+        else _pendingDayLabel = action.Date ?? "?";
+
+        // Qui
+        if (action.AssignedTo is null || action.AssignedTo.Count == 0)
+        {
+            _pendingWho = "tout le monde";
+        }
+        else
+        {
+            var ids = GeminiService.ResolveAssignedIds(action.AssignedTo, Store.Data!.People, Store.Data!.Teams);
+            _pendingWho = ids.Count == 0
+                ? string.Join(", ", action.AssignedTo)
+                : string.Join(", ", ids.Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+        }
+    }
+
+    private async Task ConfirmActionAsync()
+    {
+        if (_pendingAction is null) return;
+        _confirmBusy = true;
+        var action = _pendingAction;
+        _pendingAction = null;
+        await ExecuteAddTaskAsync(action);
+        _confirmBusy = false;
+    }
+
+    private void CancelAction()
+    {
+        _pendingAction = null;
+        _messages.Add(new ChatMessage("Annulé — la tâche n'a pas été ajoutée.", IsUser: false, IsAction: true));
     }
 
     private async Task ExecuteAddTaskAsync(AssistantAction action)

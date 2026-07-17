@@ -1,0 +1,137 @@
+@page "/partager"
+@inject SettingsService Config
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Mariage Planning — Partager</PageTitle>
+
+<header class="page-header">
+    <h1>📲 Partager le planning</h1>
+</header>
+
+@if (!Config.IsConfigured)
+{
+    <div class="settings-form">
+        <div class="sync-status sync-demo">💡 Configure d'abord l'accès au Gist dans les <a href="parametres">Paramètres</a>.</div>
+    </div>
+}
+else
+{
+    <div class="settings-form">
+
+        @* ── Partage lecture seule ───────────────────────────────────────── *@
+        <div class="share-config">
+            <h2 class="share-config-title">👁️ Accès lecture seule</h2>
+            <p class="form-hint">
+                Ce QR code donne accès au planning en lecture — aucun mot de passe requis.
+                Parfait pour partager avec tous les invités.
+            </p>
+            <button class="action-btn btn-refresh" @onclick="GenerateReadonlyAsync" disabled="@_readonlyBusy">
+                @(_readonlyBusy ? "⏳…" : "📷 Générer le QR code")
+            </button>
+            @if (_readonlyUrl is not null)
+            {
+                <div id="readonly-qr" class="share-qr"></div>
+                <div class="share-url">@_readonlyUrl</div>
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CopyReadonlyAsync">📋 Copier</button>
+                    <button class="action-btn btn-refresh" @onclick="ShareReadonlyAsync">📤 Partager</button>
+                </div>
+                @if (_readonlyCopied) { <div class="sync-status sync-ok">✅ Lien copié.</div> }
+            }
+        </div>
+
+        @* ── Partage avec modification ───────────────────────────────────── *@
+        @if (Config.CanSave)
+        {
+            <div class="share-config">
+                <h2 class="share-config-title">✏️ Accès modification</h2>
+                <p class="form-hint">
+                    Génère un lien protégé par mot de passe. Celui qui le scanne voit le planning ;
+                    ceux qui ont le mot de passe peuvent le modifier.
+                </p>
+                <label class="form-field">
+                    <span class="form-label">Mot de passe du groupe</span>
+                    <input class="form-input" type="text" @bind="_sharePassword" @bind:event="oninput"
+                           placeholder="ex : le nom du chat de Bénédicte"
+                           autocapitalize="off" autocorrect="off" spellcheck="false" />
+                </label>
+                <button class="action-btn btn-refresh" @onclick="GenerateShareAsync"
+                        disabled="@(_shareBusy || string.IsNullOrWhiteSpace(_sharePassword))">
+                    @(_shareBusy ? "⏳ Chiffrement…" : "🔗 Générer le lien")
+                </button>
+                @if (_shareUrl is not null)
+                {
+                    <div id="share-qr" class="share-qr"></div>
+                    <div class="share-url">@_shareUrl</div>
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="CopyShareAsync">📋 Copier</button>
+                        <button class="action-btn btn-refresh" @onclick="ShareAsync">📤 Partager</button>
+                    </div>
+                    @if (_shareCopied) { <div class="sync-status sync-ok">✅ Lien copié.</div> }
+                }
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    protected override async Task OnInitializedAsync() => await Config.EnsureLoadedAsync();
+
+    // ── Lecture seule ─────────────────────────────────────────────────────────
+
+    private string? _readonlyUrl;
+    private bool    _readonlyBusy;
+    private bool    _readonlyCopied;
+
+    private async Task GenerateReadonlyAsync()
+    {
+        _readonlyBusy = true; _readonlyCopied = false;
+        _readonlyUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}";
+        _readonlyBusy = false;
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("mariage.makeQr", "readonly-qr", _readonlyUrl);
+    }
+
+    private async Task CopyReadonlyAsync()
+    {
+        await JS.InvokeVoidAsync("mariage.copyText", _readonlyUrl);
+        _readonlyCopied = true;
+    }
+
+    private async Task ShareReadonlyAsync()
+    {
+        try { await JS.InvokeVoidAsync("mariage.shareText", _readonlyUrl); } catch { }
+    }
+
+    // ── Avec modification ─────────────────────────────────────────────────────
+
+    private string? _sharePassword;
+    private string? _shareUrl;
+    private bool    _shareBusy;
+    private bool    _shareCopied;
+
+    private async Task GenerateShareAsync()
+    {
+        _shareBusy = true; _shareCopied = false;
+        var blob = await JS.InvokeAsync<string>("mariage.encryptConfig", _sharePassword, Config.Token);
+        _shareUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}.{blob}";
+        _shareBusy = false;
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("mariage.makeQr", "share-qr", _shareUrl);
+    }
+
+    private async Task CopyShareAsync()
+    {
+        await JS.InvokeVoidAsync("mariage.copyText", _shareUrl);
+        _shareCopied = true;
+    }
+
+    private async Task ShareAsync()
+    {
+        try { await JS.InvokeVoidAsync("mariage.shareText", _shareUrl); } catch { }
+    }
+}

@@ -13,6 +13,7 @@
 
 <div class="settings-form">
 
+    @* ── Statut de connexion ──────────────────────────────────────────────── *@
     @if (Config.CanSave)
     {
         <div class="sync-status sync-ok">✅ Connecté — modification active sur ce téléphone.</div>
@@ -25,7 +26,7 @@
         }
         else
         {
-            <div class="sync-status sync-readonly">👁️ Lecture seule — tu n'as pas accès à la modification (scanne le QR code complet pour obtenir le mot de passe).</div>
+            <div class="sync-status sync-readonly">👁️ Lecture seule — scanne le QR code complet pour obtenir le mot de passe.</div>
         }
     }
     else
@@ -38,11 +39,11 @@
         <div class="sync-status @_feedbackClass">@_feedback</div>
     }
 
+    @* ── Déverrouillage ───────────────────────────────────────────────────── *@
     @if (!Config.CanSave && Config.LockedToken is not null)
     {
         <div class="share-config">
             <h2 class="share-config-title">🔓 Déverrouiller la modification</h2>
-            <p class="form-hint">Entre le mot de passe du groupe pour pouvoir modifier le planning.</p>
             <label class="form-field">
                 <span class="form-label">Mot de passe du groupe</span>
                 <input class="form-input" type="password" @bind="_unlockPassword" @bind:event="oninput"
@@ -53,17 +54,15 @@
                     disabled="@(_unlockBusy || string.IsNullOrWhiteSpace(_unlockPassword))">
                 @(_unlockBusy ? "⏳ Déchiffrement…" : "🔓 Déverrouiller")
             </button>
-            @if (_unlockError is not null)
-            {
-                <div class="sync-status sync-warn">⚠️ @_unlockError</div>
-            }
+            @if (_unlockError is not null) { <div class="sync-status sync-warn">⚠️ @_unlockError</div> }
         </div>
     }
 
+    @* ── Qui suis-je ? ────────────────────────────────────────────────────── *@
     @if (Store.Data?.People.Count > 0)
     {
         <div class="form-field">
-            <span class="form-label">Qui es-tu ? (onglet Moi)</span>
+            <span class="form-label">Qui es-tu ?</span>
             <select class="form-input" value="@(Config.CurrentPerson ?? "")" @onchange="OnPersonChangedAsync">
                 <option value="">— Non défini —</option>
                 @foreach (var person in Store.Data.People)
@@ -74,296 +73,24 @@
         </div>
     }
 
-    @if (Config.CanSave && Store.Data is not null)
-    {
-        <div class="share-config">
-            <h2 class="share-config-title">👥 Personnes</h2>
+    @* ── Raccourcis vers les autres pages ─────────────────────────────────── *@
+    <div class="settings-shortcuts">
+        <a class="settings-shortcut" href="partager">
+            <span class="settings-shortcut-icon">📲</span>
+            <span class="settings-shortcut-label">Partager le planning</span>
+            <span class="settings-shortcut-arrow">›</span>
+        </a>
+        @if (Store.CanEdit)
+        {
+            <a class="settings-shortcut" href="personnes">
+                <span class="settings-shortcut-icon">👥</span>
+                <span class="settings-shortcut-label">Personnes & Équipes</span>
+                <span class="settings-shortcut-arrow">›</span>
+            </a>
+        }
+    </div>
 
-            <div class="people-list">
-                @foreach (var person in Store.Data.People)
-                {
-                    var pid = person.Id;
-                    <div class="people-group">
-                        <div class="people-row">
-                            <span class="person-badge" style="--person-color: @person.Color">@person.Name</span>
-                            <div class="people-row-actions">
-                                <button class="btn-card-icon" @onclick="() => StartEditPerson(person)"
-                                        title="Modifier @person.Name">✏️</button>
-                                <button class="btn-card-icon people-delete"
-                                        @onclick="() => DeletePersonAsync(pid)"
-                                        disabled="@(_personBusy || _editingPersonId == pid)"
-                                        title="Supprimer @person.Name">🗑️</button>
-                            </div>
-                        </div>
-                        @if (_editingPersonId == pid)
-                        {
-                            <div class="add-form edit-form">
-                                <div class="add-form-row">
-                                    <label class="form-field form-grow">
-                                        <span class="form-label">Prénom *</span>
-                                        <input class="form-input" type="text" @bind="_epName" autocapitalize="words" />
-                                    </label>
-                                    <label class="form-field">
-                                        <span class="form-label">Couleur</span>
-                                        <input type="color" class="color-picker" @bind="_epColor" />
-                                    </label>
-                                </div>
-                                <label class="form-field">
-                                    <span class="form-label">📞 Téléphone</span>
-                                    <input class="form-input" type="tel" @bind="_epPhone"
-                                           placeholder="+33 6 12 34 56 78" />
-                                </label>
-                                <label class="form-field">
-                                    <span class="form-label">📍 Adresse</span>
-                                    <input class="form-input" type="text" @bind="_epAddress"
-                                           placeholder="ex : 12 rue du Château, 69400 Anse" />
-                                </label>
-                                @if (_epError is not null)
-                                {
-                                    <div class="sync-status sync-warn">⚠️ @_epError</div>
-                                }
-                                <div class="add-form-actions">
-                                    <button class="action-btn btn-clear" @onclick="() => _editingPersonId = null">Annuler</button>
-                                    <button class="action-btn btn-refresh" @onclick="SavePersonEditAsync"
-                                            disabled="@(_epBusy || string.IsNullOrWhiteSpace(_epName))">
-                                        @(_epBusy ? "⏳…" : "💾 Enregistrer")
-                                    </button>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-
-            @if (_addingPerson)
-            {
-                <div class="add-form">
-                    <div class="add-form-row">
-                        <label class="form-field form-grow">
-                            <span class="form-label">Prénom *</span>
-                            <input class="form-input" type="text" @bind="_newPersonName"
-                                   placeholder="ex : Marie" autocapitalize="words" autocorrect="off" />
-                        </label>
-                        <label class="form-field">
-                            <span class="form-label">Couleur</span>
-                            <input type="color" class="color-picker" @bind="_newPersonColor" />
-                        </label>
-                    </div>
-                    <label class="form-field">
-                        <span class="form-label">📞 Téléphone</span>
-                        <input class="form-input" type="tel" @bind="_newPersonPhone" placeholder="+33 6 12 34 56 78" />
-                    </label>
-                    <label class="form-field">
-                        <span class="form-label">📍 Adresse</span>
-                        <input class="form-input" type="text" @bind="_newPersonAddress"
-                               placeholder="ex : 12 rue du Château, 69400 Anse" />
-                    </label>
-                    <div class="add-form-actions">
-                        <button class="action-btn btn-clear" @onclick="() => _addingPerson = false">Annuler</button>
-                        <button class="action-btn btn-refresh" @onclick="AddPersonAsync"
-                                disabled="@(_personBusy || string.IsNullOrWhiteSpace(_newPersonName))">
-                            @(_personBusy ? "⏳…" : "➕ Ajouter")
-                        </button>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <button class="action-btn btn-add" @onclick="() => { _addingPerson = true; _editingPersonId = null; }">
-                    ➕ Ajouter une personne
-                </button>
-            }
-
-            @if (_personError is not null)
-            {
-                <div class="sync-status sync-warn">⚠️ @_personError</div>
-            }
-        </div>
-
-        <div class="share-config">
-            <h2 class="share-config-title">👨‍👩‍👧 Équipes</h2>
-            <p class="form-hint">Raccourcis pour assigner plusieurs personnes d'un seul clic lors de l'ajout ou la modification de tâches.</p>
-
-            <div class="people-list">
-                @foreach (var team in Store.Data.Teams)
-                {
-                    var tid = team.Id;
-                    var members = team.MemberIds
-                        .Select(mid => Store.PersonById(mid)?.Name)
-                        .Where(n => n is not null)
-                        .ToList();
-                    <div class="people-group">
-                        <div class="people-row">
-                            <div>
-                                <span class="person-badge" style="--person-color: @team.Color">@team.Name</span>
-                                <span class="team-member-count">@(members.Count == 0 ? "vide" : string.Join(", ", members))</span>
-                            </div>
-                            <div class="people-row-actions">
-                                <button class="btn-card-icon" @onclick="() => StartEditTeam(team)" title="Modifier">✏️</button>
-                                <button class="btn-card-icon people-delete" @onclick="() => DeleteTeamAsync(tid)"
-                                        disabled="@(_teamBusy || _editingTeamId == tid)" title="Supprimer">🗑️</button>
-                            </div>
-                        </div>
-                        @if (_editingTeamId == tid)
-                        {
-                            <div class="add-form edit-form">
-                                <div class="add-form-row">
-                                    <label class="form-field form-grow">
-                                        <span class="form-label">Nom *</span>
-                                        <input class="form-input" type="text" @bind="_etName" autocapitalize="words" />
-                                    </label>
-                                    <label class="form-field">
-                                        <span class="form-label">Couleur</span>
-                                        <input type="color" class="color-picker" @bind="_etColor" />
-                                    </label>
-                                </div>
-                                <div class="form-field">
-                                    <span class="form-label">Membres</span>
-                                    <div class="person-checks">
-                                        @foreach (var p in Store.Data.People)
-                                        {
-                                            <label class="person-check @(_etMembers.Contains(p.Id) ? "is-checked" : "")"
-                                                   style="--person-color: @p.Color">
-                                                <input type="checkbox" checked="@_etMembers.Contains(p.Id)"
-                                                       @onchange="e => ToggleTeamMember(p.Id, e)" />
-                                                @p.Name
-                                            </label>
-                                        }
-                                    </div>
-                                </div>
-                                @if (_teamError is not null)
-                                {
-                                    <div class="sync-status sync-warn">⚠️ @_teamError</div>
-                                }
-                                <div class="add-form-actions">
-                                    <button class="action-btn btn-clear" @onclick="() => _editingTeamId = null">Annuler</button>
-                                    <button class="action-btn btn-refresh" @onclick="SaveTeamEditAsync"
-                                            disabled="@(_teamBusy || string.IsNullOrWhiteSpace(_etName))">
-                                        @(_teamBusy ? "⏳…" : "💾 Enregistrer")
-                                    </button>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-
-            @if (_addingTeam)
-            {
-                <div class="add-form">
-                    <div class="add-form-row">
-                        <label class="form-field form-grow">
-                            <span class="form-label">Nom *</span>
-                            <input class="form-input" type="text" @bind="_etName" placeholder="ex : Équipe déco"
-                                   autocapitalize="words" />
-                        </label>
-                        <label class="form-field">
-                            <span class="form-label">Couleur</span>
-                            <input type="color" class="color-picker" @bind="_etColor" />
-                        </label>
-                    </div>
-                    <div class="form-field">
-                        <span class="form-label">Membres</span>
-                        <div class="person-checks">
-                            @foreach (var p in Store.Data.People)
-                            {
-                                <label class="person-check @(_etMembers.Contains(p.Id) ? "is-checked" : "")"
-                                       style="--person-color: @p.Color">
-                                    <input type="checkbox" checked="@_etMembers.Contains(p.Id)"
-                                           @onchange="e => ToggleTeamMember(p.Id, e)" />
-                                    @p.Name
-                                </label>
-                            }
-                        </div>
-                    </div>
-                    @if (_teamError is not null)
-                    {
-                        <div class="sync-status sync-warn">⚠️ @_teamError</div>
-                    }
-                    <div class="add-form-actions">
-                        <button class="action-btn btn-clear"
-                                @onclick="() => { _addingTeam = false; _etName = null; _etMembers = []; }">Annuler</button>
-                        <button class="action-btn btn-refresh" @onclick="AddTeamAsync"
-                                disabled="@(_teamBusy || string.IsNullOrWhiteSpace(_etName))">
-                            @(_teamBusy ? "⏳…" : "➕ Créer l'équipe")
-                        </button>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <button class="action-btn btn-add"
-                        @onclick="() => { _addingTeam = true; _editingTeamId = null; }">
-                    ➕ Ajouter une équipe
-                </button>
-            }
-        </div>
-    }
-
-    @if (Config.IsConfigured)
-    {
-        <div class="share-config">
-            <h2 class="share-config-title">📷 Partager en lecture</h2>
-            <p class="form-hint">
-                Ce QR code donne accès au planning en lecture seule — aucun mot de passe requis.
-            </p>
-            <button class="action-btn btn-refresh" @onclick="GenerateReadonlyShareAsync"
-                    disabled="@_readonlyBusy">
-                @(_readonlyBusy ? "⏳…" : "📷 Générer le QR code lecture")
-            </button>
-            @if (_readonlyUrl is not null)
-            {
-                <div id="readonly-qr" class="share-qr"></div>
-                <div class="share-url">@_readonlyUrl</div>
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="CopyReadonlyUrlAsync">📋 Copier</button>
-                    <button class="action-btn btn-refresh" @onclick="ShareReadonlyUrlAsync">📤 Partager</button>
-                </div>
-                @if (_readonlyCopied)
-                {
-                    <div class="sync-status sync-ok">✅ Lien copié.</div>
-                }
-            }
-        </div>
-    }
-
-    @if (Config.CanSave)
-    {
-        <div class="share-config">
-            <h2 class="share-config-title">📲 Partager la configuration</h2>
-            <p class="form-hint">
-                Génère un lien (et son QR code) à partager. Celui qui le scanne voit le planning
-                en <b>lecture</b> ; ceux qui ont le mot de passe peuvent déverrouiller la <b>modification</b>
-                (le token est chiffré avec ce mot de passe dans le lien).
-            </p>
-
-            <label class="form-field">
-                <span class="form-label">Mot de passe du groupe</span>
-                <input class="form-input" type="text" @bind="_sharePassword" @bind:event="oninput"
-                       placeholder="ex : le nom du chat de Bénédicte" autocapitalize="off" autocorrect="off" spellcheck="false" />
-            </label>
-
-            <button class="action-btn btn-refresh" @onclick="GenerateShareAsync"
-                    disabled="@(_shareBusy || string.IsNullOrWhiteSpace(_sharePassword))">
-                @(_shareBusy ? "⏳ Chiffrement…" : "🔗 Générer le lien à partager")
-            </button>
-
-            @if (_shareUrl is not null)
-            {
-                <div id="share-qr" class="share-qr"></div>
-                <div class="share-url">@_shareUrl</div>
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="CopyShareUrlAsync">📋 Copier</button>
-                    <button class="action-btn btn-refresh" @onclick="ShareUrlAsync">📤 Partager</button>
-                </div>
-                @if (_shareCopied)
-                {
-                    <div class="sync-status sync-ok">✅ Lien copié.</div>
-                }
-            }
-        </div>
-    }
-
+    @* ── Assistant IA ─────────────────────────────────────────────────────── *@
     <details class="config-section" open="@(!Gemini.IsConfigured)">
         <summary class="config-section-summary">🤖 Assistant IA (Gemini)</summary>
         <div class="config-section-body">
@@ -384,9 +111,9 @@
             <label class="form-field">
                 <span class="form-label">Modèle</span>
                 <input class="form-input" type="text" @bind="_geminiModel"
-                       placeholder="ex : gemini-2.5-flash"
+                       placeholder="ex : gemini-3.5-flash"
                        autocapitalize="off" autocorrect="off" spellcheck="false" />
-                <span class="form-hint">Nom exact du modèle Gemini. Laisse vide pour revenir au défaut.</span>
+                <span class="form-hint">Nom exact du modèle Gemini.</span>
             </label>
             <div class="add-form-actions">
                 <button class="action-btn btn-refresh" @onclick="SaveGeminiKeyAsync" disabled="@_geminiKeySaving">
@@ -404,6 +131,7 @@
         </div>
     </details>
 
+    @* ── Configuration de l'accès au Gist ────────────────────────────────── *@
     <details class="config-section" open="@(!Config.IsConfigured)">
         <summary class="config-section-summary">🔧 Configuration de l'accès</summary>
         <div class="config-section-body">
@@ -411,13 +139,13 @@
                 <span class="form-label">ID du Gist</span>
                 <input class="form-input" type="text" @bind="_gistId"
                        placeholder="ex : bd451c30da0d..." autocapitalize="off" autocorrect="off" spellcheck="false" />
-                <span class="form-hint">La chaîne dans l'URL du Gist (gist.github.com/toncompte/<b>ID</b>). Suffit pour lire le planning.</span>
+                <span class="form-hint">La chaîne dans l'URL du Gist. Suffit pour lire.</span>
             </label>
             <label class="form-field">
                 <span class="form-label">Token GitHub (PAT)</span>
                 <input class="form-input" type="@(_showToken ? "text" : "password")" @bind="_token"
                        placeholder="ghp_..." autocapitalize="off" autocorrect="off" spellcheck="false" />
-                <span class="form-hint">Nécessaire uniquement pour modifier le planning. Stocké sur ce téléphone, nulle part ailleurs.</span>
+                <span class="form-hint">Nécessaire pour modifier le planning.</span>
             </label>
             <label class="show-token">
                 <input type="checkbox" @bind="_showToken" /> Afficher le token
@@ -428,6 +156,7 @@
         </div>
     </details>
 
+    @* ── Actions ─────────────────────────────────────────────────────────── *@
     <button class="action-btn btn-hard-refresh" @onclick="HardRefreshAsync" disabled="@_busy">
         🔄 Forcer la mise à jour de l'app
     </button>
@@ -455,14 +184,17 @@
     private string? _feedback;
     private string  _feedbackClass = "";
 
-    // Gemini
     private string? _geminiKey;
-    private string  _geminiModel = "";
+    private string  _geminiModel  = "";
     private bool    _showGeminiKey;
     private bool    _geminiKeySaving;
     private bool    _geminiKeyTesting;
     private string? _geminiKeyFeedback;
     private bool    _geminiKeyOk;
+
+    private string? _unlockPassword;
+    private bool    _unlockBusy;
+    private string? _unlockError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -474,15 +206,17 @@
         _geminiModel = Config.GeminiModel;
     }
 
+    private async Task OnPersonChangedAsync(ChangeEventArgs e) =>
+        await Config.SetCurrentPersonAsync(e.Value?.ToString());
+
     private async Task SaveGeminiKeyAsync()
     {
-        _geminiKeySaving  = true;
-        _geminiKeyFeedback = null;
+        _geminiKeySaving = true; _geminiKeyFeedback = null;
         await Config.SetGeminiApiKeyAsync(_geminiKey);
         if (!string.IsNullOrWhiteSpace(_geminiModel))
             await Config.SetGeminiModelAsync(_geminiModel);
         _geminiKeySaving = false;
-        _geminiKeyOk     = Gemini.IsConfigured;
+        _geminiKeyOk = Gemini.IsConfigured;
         _geminiKeyFeedback = Gemini.IsConfigured
             ? "✅ Clé enregistrée — clique 🧪 Tester pour vérifier."
             : "🗑️ Clé supprimée.";
@@ -490,17 +224,16 @@
 
     private async Task TestGeminiKeyAsync()
     {
-        _geminiKeyTesting  = true;
-        _geminiKeyFeedback = null;
+        _geminiKeyTesting = true; _geminiKeyFeedback = null;
         try
         {
             await Gemini.ChatAsync("Réponds uniquement avec le mot : OK", [], "Test de connexion.");
-            _geminiKeyOk       = true;
+            _geminiKeyOk = true;
             _geminiKeyFeedback = $"✅ Connexion OK — modèle : {Config.GeminiModel}";
         }
         catch (Exception ex)
         {
-            _geminiKeyOk       = false;
+            _geminiKeyOk = false;
             _geminiKeyFeedback = $"⚠️ {ex.Message}";
         }
         finally { _geminiKeyTesting = false; }
@@ -508,21 +241,17 @@
 
     private async Task SaveAsync()
     {
-        _busy = true;
-        _feedback = null;
-
+        _busy = true; _feedback = null;
         await Config.SaveAsync(_gistId, _token);
         await Store.ReloadAsync();
-
         if (Store.Source == DataSource.Gist)
         {
-            var days = Store.Data?.Days.Count ?? 0;
-            _feedback = $"✅ Connecté au Gist — {days} jour(s) chargé(s).";
+            _feedback = $"✅ Connecté — {Store.Data?.Days.Count ?? 0} jour(s) chargé(s).";
             _feedbackClass = "sync-ok";
         }
         else if (!Config.IsConfigured)
         {
-            _feedback = "ℹ️ Aucun Gist configuré — l'app affiche la démo.";
+            _feedback = "ℹ️ Aucun Gist configuré — démo.";
             _feedbackClass = "sync-demo";
         }
         else
@@ -530,317 +259,31 @@
             _feedback = $"⚠️ Connexion impossible : {Store.LoadError ?? "vérifie l'ID du Gist et le réseau"}";
             _feedbackClass = "sync-warn";
         }
-
         _busy = false;
     }
 
-    private async Task OnPersonChangedAsync(ChangeEventArgs e) =>
-        await Config.SetCurrentPersonAsync(e.Value?.ToString());
-
-    // --- Gestion des personnes ---
-
-    private bool _addingPerson;
-    private string? _newPersonName;
-    private string _newPersonColor = "#6366f1";
-    private string? _newPersonPhone;
-    private string? _newPersonAddress;
-    private bool _personBusy;
-    private string? _personError;
-
-    private string? _editingPersonId;
-    private string? _epName;
-    private string _epColor = "#6366f1";
-    private string? _epPhone;
-    private string? _epAddress;
-    private bool _epBusy;
-    private string? _epError;
-
-    private void StartEditPerson(Person person)
-    {
-        _editingPersonId = person.Id;
-        _epName = person.Name;
-        _epColor = person.Color;
-        _epPhone = person.Phone;
-        _epAddress = person.Address;
-        _epError = null;
-        _addingPerson = false;
-    }
-
-    private async Task SavePersonEditAsync()
-    {
-        _epBusy = true;
-        _epError = null;
-        var pid = _editingPersonId!;
-        var name = _epName!.Trim();
-        var color = _epColor;
-        var phone = string.IsNullOrWhiteSpace(_epPhone) ? null : _epPhone.Trim();
-        var address = string.IsNullOrWhiteSpace(_epAddress) ? null : _epAddress.Trim();
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            var p = data.People.FirstOrDefault(p => p.Id == pid);
-            if (p is null) return false;
-            p.Name = name;
-            p.Color = color;
-            p.Phone = phone;
-            p.Address = address;
-            return true;
-        });
-
-        _epBusy = false;
-        if (ok) _editingPersonId = null;
-        else _epError = error;
-    }
-
-    private async Task AddPersonAsync()
-    {
-        _personBusy = true;
-        _personError = null;
-        var name = _newPersonName!.Trim();
-        var color = _newPersonColor;
-        var phone = string.IsNullOrWhiteSpace(_newPersonPhone) ? null : _newPersonPhone.Trim();
-        var address = string.IsNullOrWhiteSpace(_newPersonAddress) ? null : _newPersonAddress.Trim();
-        var id = Guid.NewGuid().ToString("N")[..8];
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            data.People.Add(new Person { Id = id, Name = name, Color = color, Phone = phone, Address = address });
-            return true;
-        });
-
-        _personBusy = false;
-        if (ok)
-        {
-            _newPersonName = null;
-            _newPersonColor = "#6366f1";
-            _newPersonPhone = null;
-            _newPersonAddress = null;
-            _addingPerson = false;
-        }
-        else
-        {
-            _personError = error;
-        }
-    }
-
-    private async Task DeletePersonAsync(string personId)
-    {
-        _personBusy = true;
-        _personError = null;
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            data.People.RemoveAll(p => p.Id == personId);
-            foreach (var day in data.Days)
-                foreach (var task in day.Activities)
-                    task.AssignedTo.Remove(personId);
-            foreach (var team in data.Teams)
-                team.MemberIds.Remove(personId);
-            return true;
-        });
-
-        if (ok && Config.CurrentPerson == personId)
-            await Config.SetCurrentPersonAsync(null);
-
-        _personBusy = false;
-        if (!ok)
-            _personError = error;
-    }
-
-    // --- Gestion des équipes ---
-
-    private bool _addingTeam;
-    private string? _editingTeamId;
-    private string? _etName;
-    private string _etColor = "#94a3b8";
-    private HashSet<string> _etMembers = [];
-    private bool _teamBusy;
-    private string? _teamError;
-
-    private void StartEditTeam(Team team)
-    {
-        _editingTeamId = team.Id;
-        _etName = team.Name;
-        _etColor = team.Color;
-        _etMembers = [.. team.MemberIds];
-        _teamError = null;
-        _addingTeam = false;
-    }
-
-    private void ToggleTeamMember(string personId, ChangeEventArgs e)
-    {
-        if (e.Value is true) _etMembers.Add(personId);
-        else _etMembers.Remove(personId);
-    }
-
-    private async Task AddTeamAsync()
-    {
-        _teamBusy = true;
-        _teamError = null;
-        var id = Guid.NewGuid().ToString("N")[..8];
-        var name = _etName!.Trim();
-        var color = _etColor;
-        var members = _etMembers.ToList();
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            data.Teams.Add(new Team { Id = id, Name = name, Color = color, MemberIds = members });
-            return true;
-        });
-
-        _teamBusy = false;
-        if (ok) { _addingTeam = false; _etName = null; _etColor = "#94a3b8"; _etMembers = []; }
-        else _teamError = error;
-    }
-
-    private async Task SaveTeamEditAsync()
-    {
-        _teamBusy = true;
-        _teamError = null;
-        var tid = _editingTeamId!;
-        var name = _etName!.Trim();
-        var color = _etColor;
-        var members = _etMembers.ToList();
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            var t = data.Teams.FirstOrDefault(t => t.Id == tid);
-            if (t is null) return false;
-            t.Name = name;
-            t.Color = color;
-            t.MemberIds = members;
-            return true;
-        });
-
-        _teamBusy = false;
-        if (ok) _editingTeamId = null;
-        else _teamError = error;
-    }
-
-    private async Task DeleteTeamAsync(string teamId)
-    {
-        _teamBusy = true;
-        _teamError = null;
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            data.Teams.RemoveAll(t => t.Id == teamId);
-            return true;
-        });
-
-        _teamBusy = false;
-        if (!ok) _teamError = error;
-    }
-
-    // --- Partage en lecture seule (gistId en clair) ---
-
-    private string? _readonlyUrl;
-    private bool _readonlyBusy;
-    private bool _readonlyCopied;
-
-    private async Task GenerateReadonlyShareAsync()
-    {
-        _readonlyBusy = true;
-        _readonlyCopied = false;
-        _readonlyUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}";
-        _readonlyBusy = false;
-
-        StateHasChanged();
-        await Task.Yield();
-        await JS.InvokeVoidAsync("mariage.makeQr", "readonly-qr", _readonlyUrl);
-    }
-
-    private async Task CopyReadonlyUrlAsync()
-    {
-        await JS.InvokeVoidAsync("mariage.copyText", _readonlyUrl);
-        _readonlyCopied = true;
-    }
-
-    private async Task ShareReadonlyUrlAsync()
-    {
-        try { await JS.InvokeVoidAsync("mariage.shareText", _readonlyUrl); }
-        catch { }
-    }
-
-    // --- Partage de la configuration (URL chiffrée + QR code) ---
-
-    private string? _sharePassword;
-    private string? _shareUrl;
-    private bool _shareBusy;
-    private bool _shareCopied;
-
-    private async Task GenerateShareAsync()
-    {
-        _shareBusy = true;
-        _shareCopied = false;
-
-        // Format : #<gistId>.<token chiffré> — l'ID en clair donne la lecture,
-        // le mot de passe déverrouille le token (donc la modification).
-        // Le tout voyage dans le fragment (#...) : il n'atteint jamais le serveur.
-        var blob = await JS.InvokeAsync<string>("mariage.encryptConfig", _sharePassword, Config.Token);
-        _shareUrl = $"{Nav.BaseUri}rejoindre#{Config.GistId}.{blob}";
-        _shareBusy = false;
-
-        StateHasChanged();
-        await Task.Yield(); // laisse Blazor rendre le conteneur #share-qr avant d'y dessiner
-        await JS.InvokeVoidAsync("mariage.makeQr", "share-qr", _shareUrl);
-    }
-
-    private async Task CopyShareUrlAsync()
-    {
-        await JS.InvokeVoidAsync("mariage.copyText", _shareUrl);
-        _shareCopied = true;
-    }
-
-    private async Task ShareUrlAsync()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("mariage.shareText", _shareUrl);
-        }
-        catch { /* share non supporté ou annulé */ }
-    }
-
-    // --- Déverrouillage de la modification (token chiffré reçu via un lien) ---
-
-    private string? _unlockPassword;
-    private bool _unlockBusy;
-    private string? _unlockError;
-
     private async Task UnlockAsync()
     {
-        _unlockBusy = true;
-        _unlockError = null;
-
+        _unlockBusy = true; _unlockError = null;
         try
         {
             var token = await JS.InvokeAsync<string>("mariage.decryptConfig", _unlockPassword, Config.LockedToken);
             await Config.SaveAsync(Config.GistId, token);
             _token = token;
-            _feedback = "✏️ Modification déverrouillée sur ce téléphone.";
+            _feedback = "✏️ Modification déverrouillée.";
             _feedbackClass = "sync-ok";
         }
-        catch (JSException)
-        {
-            _unlockError = "Mot de passe incorrect — réessaie.";
-        }
-        catch (Exception ex)
-        {
-            _unlockError = ex.Message;
-        }
-        finally
-        {
-            _unlockBusy = false;
-        }
+        catch (JSException) { _unlockError = "Mot de passe incorrect — réessaie."; }
+        catch (Exception ex) { _unlockError = ex.Message; }
+        finally { _unlockBusy = false; }
     }
 
     private async Task DisconnectAsync()
     {
         _token = null;
         await Config.SaveAsync(Config.GistId, null);
-        // Do NOT clear LockedToken — user can re-enter password without rescanning QR
         await Store.ReloadAsync();
-        _feedback = "🔒 Déconnecté — entre le mot de passe pour réactiver la modification.";
+        _feedback = "🔒 Déconnecté.";
         _feedbackClass = "sync-readonly";
     }
 
@@ -852,8 +295,7 @@
 
     private async Task ClearAsync()
     {
-        _gistId = null;
-        _token = null;
+        _gistId = null; _token = null;
         await Config.SaveAsync(null, null);
         await Config.SetCurrentPersonAsync(null);
         await Config.SetLockedTokenAsync(null);
