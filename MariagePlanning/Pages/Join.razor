@@ -96,7 +96,8 @@ else
 
         // Lecture immédiate : on installe le Gist, en gardant un éventuel token déjà présent.
         await Config.SaveAsync(gistId, Config.Token);
-        await Config.SetLockedTokenAsync(_blob);
+        if (_blob is not null)
+            await Config.SetLockedTokenAsync(_blob);
         await Store.ReloadAsync();
 
         _loadOk = Store.Source == DataSource.Gist;

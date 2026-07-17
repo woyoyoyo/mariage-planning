@@ -13,13 +13,19 @@ window.mariage = {
         }
     },
 
-    // Ouvre tous les jours, imprime, puis restaure l'état
-    printPlan: () => {
+    // Ouvre tous les jours, génère le QR si besoin, imprime, puis restaure l'état
+    printPlan: (shareUrl) => {
+        const qrEl = document.getElementById('print-qr');
+        if (qrEl && shareUrl) {
+            qrEl.innerHTML = '';
+            new QRCode(qrEl, { text: shareUrl, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M });
+        }
         const details = document.querySelectorAll('details.day-card');
         const wasOpen = Array.from(details).map(d => d.open);
         details.forEach(d => { d.open = true; });
         window.addEventListener('afterprint', () => {
             details.forEach((d, i) => { d.open = wasOpen[i]; });
+            if (qrEl) qrEl.innerHTML = '';
         }, { once: true });
         window.print();
     },

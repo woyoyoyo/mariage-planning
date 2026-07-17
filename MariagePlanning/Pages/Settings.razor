@@ -18,7 +18,14 @@
     }
     else if (Config.IsConfigured)
     {
-        <div class="sync-status sync-readonly">👁️ Lecture seule — entre le mot de passe pour modifier.</div>
+        @if (Config.LockedToken is not null)
+        {
+            <div class="sync-status sync-readonly">👁️ Lecture seule — entre le mot de passe ci-dessous pour modifier.</div>
+        }
+        else
+        {
+            <div class="sync-status sync-readonly">👁️ Lecture seule — tu n'as pas accès à la modification (scanne le QR code complet pour obtenir le mot de passe).</div>
+        }
     }
     else
     {

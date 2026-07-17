@@ -3,6 +3,7 @@
 @inject WeddingStore Store
 @inject SettingsService Config
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Mariage Planning</PageTitle>
 
@@ -23,6 +24,16 @@
 }
 else
 {
+    @* Bloc QR code — masqué à l'écran, affiché uniquement à l'impression *@
+    <div class="print-qr-block">
+        <div id="print-qr"></div>
+        <p class="print-qr-label">Scanner pour accéder au planning sur votre téléphone</p>
+        @if (Config.IsConfigured)
+        {
+            <p class="print-qr-url">@($"{Nav.BaseUri}rejoindre#{Config.GistId}")</p>
+        }
+    </div>
+
     <header class="page-header">
         <h1>@Store.Data.Wedding.Name</h1>
         @if (CountdownText is not null)
@@ -224,8 +235,13 @@ else
         _reloading = false;
     }
 
-    private async Task PrintAsync() =>
-        await JS.InvokeVoidAsync("mariage.printPlan");
+    private async Task PrintAsync()
+    {
+        var shareUrl = Config.IsConfigured
+            ? $"{Nav.BaseUri}rejoindre#{Config.GistId}"
+            : null;
+        await JS.InvokeVoidAsync("mariage.printPlan", shareUrl);
+    }
 
     private async Task AddDayAsync()
     {
