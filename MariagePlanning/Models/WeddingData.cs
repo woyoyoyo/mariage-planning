@@ -15,9 +15,11 @@ public class WeddingData
 public class Venue
 {
     public string Id { get; set; } = "";
-    public string Name { get; set; } = "";       // ex : "Salle des fêtes de Pommiers"
-    public string? Address { get; set; }          // ex : "12 rue du Bourg, 69480 Pommiers" — lien Maps
+    public string Name { get; set; } = "";
+    public string? Address { get; set; }
     public string? Notes { get; set; }
+    public List<string> ContactIds { get; set; } = [];
+    public List<string> PersonIds { get; set; } = [];
 }
 
 public class WeddingInfo

@@ -246,6 +246,30 @@ else
                     {
                         <p class="contact-notes">💡 @venue.Notes</p>
                     }
+                    @foreach (var cid in venue.ContactIds)
+                    {
+                        var lc = Store.Data!.Contacts.FirstOrDefault(c => c.Id == cid);
+                        if (lc is null) continue;
+                        <div class="contact-detail venue-linked-row">
+                            <span>📇 @lc.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(lc.Phone))
+                            {
+                                <a href="tel:@lc.Phone" class="venue-linked-phone">📞 @lc.Phone</a>
+                            }
+                        </div>
+                    }
+                    @foreach (var pid in venue.PersonIds)
+                    {
+                        var lp = Store.PersonById(pid);
+                        if (lp is null) continue;
+                        <div class="contact-detail venue-linked-row">
+                            <span class="person-badge" style="--person-color:@lp.Color">@lp.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(lp.Phone))
+                            {
+                                <a href="tel:@lp.Phone" class="venue-linked-phone">📞 @lp.Phone</a>
+                            }
+                        </div>
+                    }
                 </div>
             }
         }
@@ -432,19 +456,23 @@ else
     private string? _vfName;
     private string? _vfAddress;
     private string? _vfNotes;
+    private HashSet<string> _vfContactIds = [];
+    private HashSet<string> _vfPersonIds = [];
 
     private void StartVenueAdd()
     {
         _vAddingNew = true;
         _vEditingId = null;
-        _vfName = null; _vfAddress = null; _vfNotes = null; _vError = null;
+        _vfName = null; _vfAddress = null; _vfNotes = null;
+        _vfContactIds = []; _vfPersonIds = []; _vError = null;
     }
 
     private void StartVenueEdit(Venue v)
     {
         _vEditingId = v.Id;
         _vAddingNew = false;
-        _vfName = v.Name; _vfAddress = v.Address; _vfNotes = v.Notes; _vError = null;
+        _vfName = v.Name; _vfAddress = v.Address; _vfNotes = v.Notes;
+        _vfContactIds = [.. v.ContactIds]; _vfPersonIds = [.. v.PersonIds]; _vError = null;
     }
 
     private void CancelVenueForm()
@@ -492,7 +520,9 @@ else
         Id = id,
         Name = _vfName!.Trim(),
         Address = string.IsNullOrWhiteSpace(_vfAddress) ? null : _vfAddress.Trim(),
-        Notes = string.IsNullOrWhiteSpace(_vfNotes) ? null : _vfNotes.Trim()
+        Notes = string.IsNullOrWhiteSpace(_vfNotes) ? null : _vfNotes.Trim(),
+        ContactIds = _vfContactIds.ToList(),
+        PersonIds = _vfPersonIds.ToList()
     };
 
     private RenderFragment VenueFields() => __builder =>
@@ -512,6 +542,43 @@ else
             <textarea class="form-input form-textarea" @bind="_vfNotes" rows="2"
                       placeholder="ex : Parking derrière la mairie, entrer par le portail rouge"></textarea>
         </label>
+        @if ((Store.Data?.Contacts.Count ?? 0) > 0)
+        {
+            <div class="form-field">
+                <span class="form-label">📇 Contacts liés</span>
+                <div class="contact-checks">
+                    @foreach (var c in Store.Data!.Contacts)
+                    {
+                        var cid = c.Id;
+                        <label class="contact-check @(_vfContactIds.Contains(cid) ? "is-checked" : "")">
+                            <input type="checkbox"
+                                   checked="@_vfContactIds.Contains(cid)"
+                                   @onchange="e => { if (e.Value is true) _vfContactIds.Add(cid); else _vfContactIds.Remove(cid); }" />
+                            @c.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+        @if ((Store.Data?.People.Count ?? 0) > 0)
+        {
+            <div class="form-field">
+                <span class="form-label">👤 Personnes liées</span>
+                <div class="person-checks">
+                    @foreach (var p in Store.Data!.People)
+                    {
+                        var pid = p.Id;
+                        <label class="person-check @(_vfPersonIds.Contains(pid) ? "is-checked" : "")"
+                               style="--person-color: @p.Color">
+                            <input type="checkbox"
+                                   checked="@_vfPersonIds.Contains(pid)"
+                                   @onchange="e => { if (e.Value is true) _vfPersonIds.Add(pid); else _vfPersonIds.Remove(pid); }" />
+                            @p.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
     };
 
     private RenderFragment ContactFields() => __builder =>
