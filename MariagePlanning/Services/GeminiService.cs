@@ -22,7 +22,7 @@ public class AssistantAction
 public class GeminiService(SettingsService settings)
 {
     private static readonly HttpClient _http = new();
-    private const string ApiBase = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    private const string ApiBase = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(settings.GeminiApiKey);
 
