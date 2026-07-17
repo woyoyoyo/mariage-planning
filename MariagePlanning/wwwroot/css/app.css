@@ -55,6 +55,14 @@ html, body {
     user-select: none;
 }
 
+.app-by {
+    text-align: center;
+    font-size: 11px;
+    color: var(--color-border);
+    margin: 8px 0 0;
+    letter-spacing: 0.04em;
+}
+
 .bottom-nav {
     position: fixed;
     bottom: 0;
