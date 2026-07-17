@@ -2,7 +2,6 @@
 @implements IDisposable
 @inject WeddingStore Store
 @inject SettingsService Config
-@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — Contacts</PageTitle>
 
@@ -164,20 +163,9 @@ else
                                 }
                             </div>
                         </div>
-                        <button class="action-btn btn-export-person"
-                                @onclick="() => ExportPersonAsync(pid)"
-                                title="Imprimer le planning de @person.Name">
-                            📄 Exporter
-                        </button>
                     </div>
                 }
             </div>
-        }
-        @if (Store.CanEdit)
-        {
-            <a class="action-btn btn-clear" href="personnes" style="display:inline-block;text-align:center;margin-top:8px">
-                ✏️ Gérer les personnes →
-            </a>
         }
     }
 
@@ -206,84 +194,15 @@ else
                 </div>
             }
         }
-        @if (Store.CanEdit)
-        {
-            <a class="action-btn btn-clear" href="personnes" style="display:inline-block;text-align:center;margin-top:8px">
-                ✏️ Gérer les équipes →
-            </a>
-        }
     }
 
     </div>
 
-    @* ── Planning par personne pour impression ──────────────────────────── *@
-    @if (_printPersonId is not null)
-    {
-        var person = Store.PersonById(_printPersonId);
-        <div class="print-planning">
-            <h1 class="print-planning-title">Planning — @person?.Name</h1>
-            <p class="print-planning-date">Imprimé le @DateTime.Now.ToString("d MMMM yyyy")</p>
-            @foreach (var day in Store.OrderedDays)
-            {
-                var pid2 = _printPersonId;
-                var tasks = day.Activities
-                    .Where(t => WeddingStore.ConcernsPerson(t, pid2))
-                    .OrderBy(t => t.Time ?? "99:99")
-                    .ToList();
-                @if (tasks.Count > 0)
-                {
-                    <div class="print-day-block">
-                        <h2 class="print-day-heading">
-                            @FrenchDate.Long(day.Date) — @day.Label
-                            @if (Store.IsWeddingDay(day)) { <span> ✨ Jour J</span> }
-                        </h2>
-                        @foreach (var task in tasks)
-                        {
-                            <div class="print-task-row">
-                                <span class="print-task-time">@(task.Time ?? "—")</span>
-                                <span class="print-task-title">@task.Title</span>
-                                @if (!string.IsNullOrWhiteSpace(task.Location))
-                                {
-                                    <span class="print-task-loc">📍 @task.Location</span>
-                                }
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(task.Notes))
-                            {
-                                <div class="print-task-notes">💡 @task.Notes</div>
-                            }
-                        }
-                    </div>
-                }
-            }
-        </div>
-    }
 }
 
 @code {
     private enum Tab { Contacts, Personnes, Equipes }
     private Tab _tab = Tab.Contacts;
-
-    // ── Impression par personne ───────────────────────────────────────────────
-
-    private string? _printPersonId;
-    private bool    _pendingPrint;
-
-    private void ExportPersonAsync(string personId)
-    {
-        _printPersonId = personId;
-        _pendingPrint  = true;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_pendingPrint)
-        {
-            _pendingPrint = false;
-            await JS.InvokeVoidAsync("mariage.printNow");
-            _printPersonId = null;
-            StateHasChanged();
-        }
-    }
 
     // ── Contacts ─────────────────────────────────────────────────────────────
 
