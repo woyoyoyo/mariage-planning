@@ -34,6 +34,47 @@
 }
 else
 {
+    @* ── Planning complet pour impression (masqué à l'écran) ────────────── *@
+    <div class="print-planning">
+        <h1 class="print-planning-title">@Store.Data.Wedding.Name</h1>
+        <p class="print-planning-date">Planning complet — imprimé le @DateTime.Now.ToString("d MMMM yyyy")</p>
+        @foreach (var day in Store.OrderedDays)
+        {
+            <div class="print-day-block">
+                <h2 class="print-day-heading">
+                    @FrenchDate.Long(day.Date) — @day.Label
+                    @if (Store.IsWeddingDay(day)) { <span> ✨ Jour J</span> }
+                </h2>
+                @if (!day.Activities.Any())
+                {
+                    <p class="print-empty">Aucune tâche prévue.</p>
+                }
+                else
+                {
+                    @foreach (var task in day.Activities.OrderBy(t => t.Time ?? "99:99"))
+                    {
+                        var people = task.AssignedTo.Count == 0
+                            ? "Tout le monde"
+                            : string.Join(", ", Store.AssignedPeople(task).Select(p => p.Name));
+                        <div class="print-task-row">
+                            <span class="print-task-time">@(task.Time ?? "—")</span>
+                            <span class="print-task-title">@task.Title</span>
+                            <span class="print-task-who">@people</span>
+                            @if (!string.IsNullOrWhiteSpace(task.Location))
+                            {
+                                <span class="print-task-loc">📍 @task.Location</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(task.Notes))
+                        {
+                            <div class="print-task-notes">💡 @task.Notes</div>
+                        }
+                    }
+                }
+            </div>
+        }
+    </div>
+
     <div class="tile-grid">
 
         @* ── Compte à rebours ────────────────────────────────────────── *@
