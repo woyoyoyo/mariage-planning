@@ -22,7 +22,7 @@ public class AssistantAction
 public class GeminiService(SettingsService settings)
 {
     private static readonly HttpClient _http = new();
-    public const string DefaultModel = "gemini-2.0-flash";
+    public const string DefaultModel = "gemini-2.5-flash-lite";
     private string ApiUrl => $"https://generativelanguage.googleapis.com/v1beta/models/{settings.GeminiModel}:generateContent";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(settings.GeminiApiKey);
