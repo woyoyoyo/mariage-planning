@@ -1,0 +1,314 @@
+@page "/todos"
+@implements IDisposable
+@inject WeddingStore Store
+
+<PageTitle>Mariage Planning — À faire</PageTitle>
+
+<header class="page-header no-print">
+    <h1>📝 À faire</h1>
+    <div class="wedding-sub">Tâches à finaliser avant le grand jour</div>
+</header>
+
+@if (Store.Data is null)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else
+{
+    @* ── Formulaire d'ajout ──────────────────────────────────────────────── *@
+    @if (Store.CanEdit)
+    {
+        @if (_adding || _editingId is not null)
+        {
+            <div class="add-form todo-form">
+                <label class="form-field">
+                    <span class="form-label">Titre *</span>
+                    <input class="form-input" type="text" @bind="_fTitle"
+                           placeholder="ex : Confirmer la salle de réception"
+                           autocapitalize="sentences" />
+                </label>
+                <label class="form-field">
+                    <span class="form-label">📅 Date butoir</span>
+                    <input class="form-input" type="date" @bind="_fDueDate" />
+                </label>
+                <label class="form-field">
+                    <span class="form-label">💡 Notes</span>
+                    <textarea class="form-input form-textarea" @bind="_fNotes" rows="2"
+                              placeholder="Détails, numéro de devis…"></textarea>
+                </label>
+
+                @if (Store.Data.People.Any())
+                {
+                    <div class="form-field">
+                        <span class="form-label">👤 Responsable(s)</span>
+                        <div class="person-checks">
+                            @foreach (var person in Store.Data.People)
+                            {
+                                <label class="person-check @(_fPersonIds.Contains(person.Id) ? "is-checked" : "")"
+                                       style="--person-color:@person.Color">
+                                    <input type="checkbox" checked="@_fPersonIds.Contains(person.Id)"
+                                           @onchange="e => Toggle(_fPersonIds, person.Id, e)" />
+                                    @person.Name
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (Store.Data.Contacts.Any())
+                {
+                    <div class="form-field">
+                        <span class="form-label">📇 Contact(s) lié(s)</span>
+                        <div class="person-checks">
+                            @foreach (var contact in Store.Data.Contacts)
+                            {
+                                <label class="person-check @(_fContactIds.Contains(contact.Id) ? "is-checked" : "")"
+                                       style="--person-color:#64748b">
+                                    <input type="checkbox" checked="@_fContactIds.Contains(contact.Id)"
+                                           @onchange="e => Toggle(_fContactIds, contact.Id, e)" />
+                                    @contact.Name
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (_formError is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_formError</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fTitle))">
+                        @(_busy ? "⏳…" : (_editingId is null ? "➕ Ajouter" : "💾 Enregistrer"))
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <button class="action-btn btn-add" style="margin-bottom:4px" @onclick="StartAdd">
+                ➕ Ajouter un todo
+            </button>
+        }
+    }
+
+    @* ── Liste groupée ───────────────────────────────────────────────────── *@
+    @if (!Store.Data.Todos.Any())
+    {
+        <div class="empty-message">Aucune tâche à faire pour l'instant.</div>
+    }
+
+    @TodoGroup("🔴 En retard", Overdue, "todo-group-overdue")
+    @TodoGroup("🟠 Aujourd'hui", TodayItems, "todo-group-today")
+    @TodoGroup("🟡 Cette semaine", ThisWeek, "todo-group-week")
+    @TodoGroup("🔵 À venir", Later, "todo-group-later")
+    @TodoGroup("⚪ Sans date", NoDate, "todo-group-nodate")
+
+    @if (Done.Any())
+    {
+        <details class="todo-done-section">
+            <summary class="todo-done-summary">✅ Terminés (@Done.Count)</summary>
+            @foreach (var todo in Done)
+            {
+                @TodoRow(todo, Today)
+            }
+        </details>
+    }
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnChanged;
+        await Store.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Store.Changed -= OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    // ── Formulaire ───────────────────────────────────────────────────────────
+
+    private bool    _adding;
+    private string? _editingId;
+    private bool    _busy;
+    private string? _formError;
+
+    private string?          _fTitle;
+    private DateTime?        _fDueDate;
+    private string?          _fNotes;
+    private HashSet<string>  _fPersonIds  = [];
+    private HashSet<string>  _fContactIds = [];
+
+    private void StartAdd()
+    {
+        _adding = true; _editingId = null;
+        _fTitle = null; _fDueDate = null; _fNotes = null;
+        _fPersonIds = []; _fContactIds = []; _formError = null;
+    }
+
+    private void StartEdit(TodoItem t)
+    {
+        _editingId = t.Id; _adding = false;
+        _fTitle    = t.Title;
+        _fDueDate  = t.DueDate.HasValue ? t.DueDate.Value.ToDateTime(TimeOnly.MinValue) : null;
+        _fNotes    = t.Notes;
+        _fPersonIds  = [.. t.PersonIds];
+        _fContactIds = [.. t.ContactIds];
+        _formError = null;
+    }
+
+    private void CancelForm() { _adding = false; _editingId = null; _formError = null; }
+
+    private static void Toggle(HashSet<string> set, string id, ChangeEventArgs e)
+    {
+        if (e.Value is true) set.Add(id); else set.Remove(id);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _formError = null;
+        var due   = _fDueDate.HasValue ? DateOnly.FromDateTime(_fDueDate.Value) : (DateOnly?)null;
+        var title = _fTitle!.Trim();
+
+        if (_editingId is null)
+        {
+            var id = Guid.NewGuid().ToString("N")[..10];
+            var (ok, err) = await Store.SaveAsync(data =>
+            {
+                data.Todos.Add(new TodoItem
+                {
+                    Id = id, Title = title, DueDate = due,
+                    Notes = string.IsNullOrWhiteSpace(_fNotes) ? null : _fNotes.Trim(),
+                    PersonIds  = [.. _fPersonIds],
+                    ContactIds = [.. _fContactIds]
+                });
+                return true;
+            });
+            _busy = false;
+            if (ok) CancelForm(); else _formError = err;
+        }
+        else
+        {
+            var eid = _editingId;
+            var (ok, err) = await Store.SaveAsync(data =>
+            {
+                var t = data.Todos.FirstOrDefault(t => t.Id == eid);
+                if (t is null) return false;
+                t.Title    = title;
+                t.DueDate  = due;
+                t.Notes    = string.IsNullOrWhiteSpace(_fNotes) ? null : _fNotes.Trim();
+                t.PersonIds  = [.. _fPersonIds];
+                t.ContactIds = [.. _fContactIds];
+                return true;
+            });
+            _busy = false;
+            if (ok) CancelForm(); else _formError = err;
+        }
+    }
+
+    private async Task ToggleDoneAsync(string id)
+    {
+        await Store.SaveAsync(data =>
+        {
+            var t = data.Todos.FirstOrDefault(t => t.Id == id);
+            if (t is null) return false;
+            t.Status = t.IsDone ? "todo" : "done";
+            return true;
+        });
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        await Store.SaveAsync(data => { data.Todos.RemoveAll(t => t.Id == id); return true; });
+    }
+
+    // ── Groupes calculés ─────────────────────────────────────────────────────
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private List<TodoItem> Pending => Store.Data?.Todos.Where(t => !t.IsDone).ToList() ?? [];
+    private List<TodoItem> Done    => Store.Data?.Todos.Where(t => t.IsDone).ToList() ?? [];
+
+    private List<TodoItem> Overdue   => Pending.Where(t =>  t.DueDate.HasValue && t.DueDate <  Today).OrderBy(t => t.DueDate).ToList();
+    private List<TodoItem> TodayItems=> Pending.Where(t =>  t.DueDate == Today).ToList();
+    private List<TodoItem> ThisWeek  => Pending.Where(t =>  t.DueDate.HasValue && t.DueDate >  Today && t.DueDate <= Today.AddDays(7)).OrderBy(t => t.DueDate).ToList();
+    private List<TodoItem> Later     => Pending.Where(t =>  t.DueDate.HasValue && t.DueDate >  Today.AddDays(7)).OrderBy(t => t.DueDate).ToList();
+    private List<TodoItem> NoDate    => Pending.Where(t => !t.DueDate.HasValue).ToList();
+
+    // ── Rendu ────────────────────────────────────────────────────────────────
+
+    private RenderFragment TodoGroup(string label, List<TodoItem> items, string css) => __builder =>
+    {
+        if (!items.Any()) return;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        <div class="todo-group @css">
+            <div class="todo-group-title">@label</div>
+            @foreach (var todo in items)
+            {
+                @TodoRow(todo, today)
+            }
+        </div>
+    };
+
+    private RenderFragment TodoRow(TodoItem todo, DateOnly today) => __builder =>
+    {
+        var tid = todo.Id;
+        <div class="todo-item @(todo.IsDone ? "todo-item-done" : "")">
+            <button class="todo-check" @onclick="() => ToggleDoneAsync(tid)"
+                    disabled="@(!Store.CanEdit)">
+                @(todo.IsDone ? "✅" : "⬜")
+            </button>
+            <div class="todo-body">
+                <div class="todo-title-row">
+                    <span class="todo-title">@todo.Title</span>
+                    @if (todo.DueDate.HasValue)
+                    {
+                        var urgency = !todo.IsDone && todo.DueDate < today ? "todo-due-overdue"
+                                    : !todo.IsDone && todo.DueDate == today ? "todo-due-today"
+                                    : !todo.IsDone && todo.DueDate <= today.AddDays(7) ? "todo-due-week"
+                                    : "todo-due-later";
+                        <span class="todo-due @urgency">@FrenchDate.Short(todo.DueDate.Value)</span>
+                    }
+                    @if (Store.CanEdit && !todo.IsDone)
+                    {
+                        <button class="btn-card-icon todo-edit-btn" @onclick="() => StartEdit(todo)" title="Modifier">✏️</button>
+                        <button class="btn-card-icon todo-edit-btn people-delete" @onclick="() => DeleteAsync(tid)" title="Supprimer">🗑️</button>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(todo.Notes))
+                {
+                    <div class="todo-notes">@todo.Notes</div>
+                }
+                @if (todo.PersonIds.Any() || todo.ContactIds.Any())
+                {
+                    <div class="todo-meta">
+                        @foreach (var pid in todo.PersonIds)
+                        {
+                            var p = Store.PersonById(pid);
+                            if (p is not null)
+                            {
+                                <span class="person-badge" style="--person-color:@p.Color">@p.Name</span>
+                            }
+                        }
+                        @foreach (var cid in todo.ContactIds)
+                        {
+                            var c = Store.Data?.Contacts.FirstOrDefault(c => c.Id == cid);
+                            if (c is not null)
+                            {
+                                <span class="todo-contact">
+                                    📇 @c.Name
+                                    @if (!string.IsNullOrWhiteSpace(c.Phone))
+                                    {
+                                        <a href="tel:@c.Phone" class="todo-contact-phone" @onclick:stopPropagation="true">@c.Phone</a>
+                                    }
+                                </span>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    };
+}

@@ -17,6 +17,9 @@ public static class FrenchDate
     public static string Long(DateOnly d) =>
         $"{Days[(int)d.DayOfWeek]} {DayNumber(d)} {Months[d.Month - 1]}";
 
+    /// <summary>Ex : "10 juin" / "1er mai".</summary>
+    public static string Short(DateOnly d) => $"{DayNumber(d)} {Months[d.Month - 1]}";
+
     /// <summary>Ex : "10 juin – 13 juin".</summary>
     public static string Range(DateOnly start, DateOnly end) =>
         $"{DayNumber(start)} {Months[start.Month - 1]} – {DayNumber(end)} {Months[end.Month - 1]}";

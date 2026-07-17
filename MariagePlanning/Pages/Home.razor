@@ -191,6 +191,21 @@ else
             <div class="tile-tag">CONTACTS</div>
         </a>
 
+        @* ── Todos ───────────────────────────────────────────────────── *@
+        @{
+            var today2    = DateOnly.FromDateTime(DateTime.Now);
+            var todoTotal = Store.Data.Todos.Count(t => !t.IsDone);
+            var todoLate  = Store.Data.Todos.Count(t => !t.IsDone && t.DueDate.HasValue && t.DueDate < today2);
+        }
+        <a class="tile @(todoLate > 0 ? "tile-todo-late" : "tile-muted")" href="todos">
+            <div class="tile-big-num">@todoTotal</div>
+            <div class="tile-tag">À FAIRE</div>
+            @if (todoLate > 0)
+            {
+                <div class="tile-sub" style="font-size:10px;opacity:.85">⚠️ @todoLate en retard</div>
+            }
+        </a>
+
         @* ── Actions ─────────────────────────────────────────────────── *@
         <button class="tile tile-action no-print" @onclick="ReloadAsync" disabled="@_reloading">
             <div class="tile-icon-lg">@(_reloading ? "⏳" : "🔄")</div>

@@ -8,6 +8,7 @@ public class WeddingData
     public List<Team> Teams { get; set; } = [];
     public List<Contact> Contacts { get; set; } = [];
     public List<WeddingDay> Days { get; set; } = [];
+    public List<TodoItem> Todos { get; set; } = [];
 }
 
 public class WeddingInfo
@@ -77,6 +78,25 @@ public class TaskItem
 
     /// <summary>Adresse / lieu associé à la tâche (lien Google Maps affiché sur la carte).</summary>
     public string? Location { get; set; }
+
+    public bool IsDone => Status == "done";
+}
+
+public class TodoItem
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public DateOnly? DueDate { get; set; }
+    public string? Notes { get; set; }
+
+    /// <summary>todo | done</summary>
+    public string Status { get; set; } = "todo";
+
+    /// <summary>Ids des personnes responsables.</summary>
+    public List<string> PersonIds { get; set; } = [];
+
+    /// <summary>Ids des contacts (prestataires) liés.</summary>
+    public List<string> ContactIds { get; set; } = [];
 
     public bool IsDone => Status == "done";
 }
