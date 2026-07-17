@@ -31,11 +31,25 @@ else
                       placeholder="ex : Camionnette de Bernard, entrer par le portail arrière"></textarea>
         </label>
 
-        <label class="form-field">
-            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel — lien Maps)</span></span>
-            <input class="form-input" type="text" @bind="_location"
-                   placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
-        </label>
+        <div class="form-field">
+            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel)</span></span>
+            @if ((Store.Data?.Venues.Count ?? 0) > 0)
+            {
+                <select class="form-input" @bind="_venueId">
+                    <option value="">— Choisir un lieu —</option>
+                    @foreach (var v in Store.Data!.Venues)
+                    {
+                        <option value="@v.Id">@v.Name</option>
+                    }
+                    <option value="__custom">✏️ Saisir une adresse</option>
+                </select>
+            }
+            @if ((Store.Data?.Venues.Count ?? 0) == 0 || _venueId == "__custom")
+            {
+                <input class="form-input" style="margin-top:4px" type="text" @bind="_location"
+                       placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
+            }
+        </div>
 
         @if ((Store.Data?.Contacts.Count ?? 0) > 0)
         {
@@ -119,6 +133,7 @@ else
     private string? _title;
     private string? _notes;
     private string? _location;
+    private string  _venueId = "";
     private HashSet<string> _assigned = [];
     private HashSet<string> _contactIds = [];
 
@@ -182,13 +197,15 @@ else
         _busy = true;
         _error = null;
 
+        var venueId = _venueId is "" or "__custom" ? null : _venueId;
         var task = new TaskItem
         {
             Id = $"t-{Guid.NewGuid():N}"[..14],
             Time = _time?.ToString("HH:mm"),
             Title = _title!.Trim(),
             Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
-            Location = string.IsNullOrWhiteSpace(_location) ? null : _location.Trim(),
+            Location = venueId is null && !string.IsNullOrWhiteSpace(_location) ? _location.Trim() : null,
+            VenueId = venueId,
             AssignedTo = _assigned.ToList(),
             ContactIds = _contactIds.ToList(),
             Status = "todo"
@@ -216,6 +233,7 @@ else
             _title = null;
             _notes = null;
             _location = null;
+            _venueId = "";
             _assigned = [];
             _contactIds = [];
         }

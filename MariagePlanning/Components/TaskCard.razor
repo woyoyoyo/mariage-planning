@@ -18,11 +18,25 @@
             <textarea class="form-input form-textarea" @bind="_eNotes" rows="2"></textarea>
         </label>
 
-        <label class="form-field">
-            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel — lien Maps)</span></span>
-            <input class="form-input" type="text" @bind="_eLocation"
-                   placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
-        </label>
+        <div class="form-field">
+            <span class="form-label">📍 Lieu <span class="form-hint-inline">(optionnel)</span></span>
+            @if ((Store.Data?.Venues.Count ?? 0) > 0)
+            {
+                <select class="form-input" @bind="_eVenueId">
+                    <option value="">— Choisir un lieu —</option>
+                    @foreach (var v in Store.Data!.Venues)
+                    {
+                        <option value="@v.Id">@v.Name</option>
+                    }
+                    <option value="__custom">✏️ Saisir une adresse</option>
+                </select>
+            }
+            @if ((Store.Data?.Venues.Count ?? 0) == 0 || _eVenueId == "__custom")
+            {
+                <input class="form-input" style="margin-top:4px" type="text" @bind="_eLocation"
+                       placeholder="ex : Salle des fêtes, Pommiers" autocapitalize="sentences" />
+            }
+        </div>
 
         @if ((Store.Data?.Contacts.Count ?? 0) > 0)
         {
@@ -124,12 +138,24 @@ else
             <p class="task-notes">💡 @Task.Notes</p>
         }
 
-        @if (!string.IsNullOrWhiteSpace(Task.Location))
+        @{
+            var venue      = Task.VenueId is not null ? Store.VenueById(Task.VenueId) : null;
+            var locLabel   = venue?.Name ?? Task.Location;
+            var locAddress = venue?.Address ?? Task.Location;
+        }
+        @if (locLabel is not null)
         {
-            <a href="@MapsUrl(Task.Location)" target="_blank" rel="noopener"
-               class="task-location" @onclick:stopPropagation="true">
-                📍 @Task.Location
-            </a>
+            @if (locAddress is not null)
+            {
+                <a href="@MapsUrl(locAddress)" target="_blank" rel="noopener"
+                   class="task-location" @onclick:stopPropagation="true">
+                    📍 @locLabel
+                </a>
+            }
+            else
+            {
+                <span class="task-location task-location-nomap">📍 @locLabel</span>
+            }
         }
 
         @if (Task.ContactIds.Count > 0)
@@ -194,6 +220,7 @@ else
     private string? _eTitle;
     private string? _eNotes;
     private string? _eLocation;
+    private string  _eVenueId = "";
     private HashSet<string> _eAssigned = [];
     private HashSet<string> _eContactIds = [];
 
@@ -229,6 +256,7 @@ else
         _eAssigned = [.. Task.AssignedTo];
         _eContactIds = [.. Task.ContactIds];
         _eLocation = Task.Location;
+        _eVenueId  = Task.VenueId ?? (Task.Location is not null ? "__custom" : "");
         _error = null;
         _editing = true;
     }
@@ -271,7 +299,8 @@ else
         var time = _eTime?.ToString("HH:mm");
         var title = _eTitle!.Trim();
         var notes = string.IsNullOrWhiteSpace(_eNotes) ? null : _eNotes.Trim();
-        var location = string.IsNullOrWhiteSpace(_eLocation) ? null : _eLocation.Trim();
+        var venueId  = _eVenueId is "" or "__custom" ? null : _eVenueId;
+        var location = venueId is null && !string.IsNullOrWhiteSpace(_eLocation) ? _eLocation.Trim() : null;
         var assigned = _eAssigned.ToList();
         var contactIds = _eContactIds.ToList();
 
@@ -286,6 +315,7 @@ else
             task.Title = title;
             task.Notes = notes;
             task.Location = location;
+            task.VenueId = venueId;
             task.AssignedTo = assigned;
             task.ContactIds = contactIds;
 

@@ -296,6 +296,13 @@ else
         _ready = true;
     }
 
+    protected override Task OnParametersSetAsync()
+    {
+        if (_ready)
+            ResolveDay();
+        return Task.CompletedTask;
+    }
+
     public void Dispose() => Store.Changed -= OnChanged;
 
     private void OnChanged()

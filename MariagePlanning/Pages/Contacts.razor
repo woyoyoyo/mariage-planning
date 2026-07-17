@@ -25,6 +25,10 @@
             👥 Équipes
             <span class="tab-count">@Store.Data.Teams.Count</span>
         </button>
+        <button class="tab @(_tab == Tab.Lieux ? "tab-active" : "")" @onclick='() => _tab = Tab.Lieux'>
+            📍 Lieux
+            <span class="tab-count">@Store.Data.Venues.Count</span>
+        </button>
     </div>
 }
 
@@ -170,7 +174,7 @@ else
     }
 
     @* ── Onglet Équipes ────────────────────────────────────────────────── *@
-    else
+    else if (_tab == Tab.Equipes)
     {
         @if (Store.Data.Teams.Count == 0)
         {
@@ -196,12 +200,95 @@ else
         }
     }
 
+    @* ── Onglet Lieux ──────────────────────────────────────────────────── *@
+    else if (_tab == Tab.Lieux)
+    {
+        @foreach (var venue in Store.Data.Venues)
+        {
+            var vid = venue.Id;
+            @if (_vEditingId == vid)
+            {
+                <div class="add-form edit-form contact-form">
+                    @VenueFields()
+                    @if (_vError is not null)
+                    {
+                        <div class="sync-status sync-warn">⚠️ @_vError</div>
+                    }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="CancelVenueForm" disabled="@_vBusy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="SaveVenueEditAsync"
+                                disabled="@(_vBusy || string.IsNullOrWhiteSpace(_vfName))">
+                            @(_vBusy ? "⏳…" : "💾 Enregistrer")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="contact-card">
+                    <div class="contact-card-head">
+                        <span class="contact-name">@venue.Name</span>
+                        @if (Store.CanEdit)
+                        {
+                            <div class="people-row-actions">
+                                <button class="btn-card-icon" @onclick="() => StartVenueEdit(venue)" title="Modifier">✏️</button>
+                                <button class="btn-card-icon people-delete" @onclick="() => DeleteVenueAsync(vid)" title="Supprimer">🗑️</button>
+                            </div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(venue.Address))
+                    {
+                        <a href="@MapsUrl(venue.Address)" target="_blank" rel="noopener" class="contact-action">
+                            📍 @venue.Address
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(venue.Notes))
+                    {
+                        <p class="contact-notes">💡 @venue.Notes</p>
+                    }
+                </div>
+            }
+        }
+
+        @if (Store.Data.Venues.Count == 0 && !Store.CanEdit)
+        {
+            <div class="empty-message">Aucun lieu enregistré.</div>
+        }
+
+        @if (Store.CanEdit)
+        {
+            @if (_vAddingNew)
+            {
+                <div class="add-form contact-form">
+                    @VenueFields()
+                    @if (_vError is not null)
+                    {
+                        <div class="sync-status sync-warn">⚠️ @_vError</div>
+                    }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="CancelVenueForm" disabled="@_vBusy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="SaveVenueAddAsync"
+                                disabled="@(_vBusy || string.IsNullOrWhiteSpace(_vfName))">
+                            @(_vBusy ? "⏳…" : "➕ Ajouter")
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (_vEditingId is null)
+            {
+                <button class="action-btn btn-add contact-add-btn" @onclick="StartVenueAdd">
+                    ➕ Ajouter un lieu
+                </button>
+            }
+        }
+    }
+
     </div>
 
 }
 
 @code {
-    private enum Tab { Contacts, Personnes, Equipes }
+    private enum Tab { Contacts, Personnes, Equipes, Lieux }
     private Tab _tab = Tab.Contacts;
 
     // ── Contacts ─────────────────────────────────────────────────────────────
@@ -334,6 +421,98 @@ else
             return url.Length > 42 ? url[..42] + "…" : url;
         }
     }
+
+    // ── Venues ───────────────────────────────────────────────────────────────
+
+    private bool _vAddingNew;
+    private string? _vEditingId;
+    private bool _vBusy;
+    private string? _vError;
+
+    private string? _vfName;
+    private string? _vfAddress;
+    private string? _vfNotes;
+
+    private void StartVenueAdd()
+    {
+        _vAddingNew = true;
+        _vEditingId = null;
+        _vfName = null; _vfAddress = null; _vfNotes = null; _vError = null;
+    }
+
+    private void StartVenueEdit(Venue v)
+    {
+        _vEditingId = v.Id;
+        _vAddingNew = false;
+        _vfName = v.Name; _vfAddress = v.Address; _vfNotes = v.Notes; _vError = null;
+    }
+
+    private void CancelVenueForm()
+    {
+        _vAddingNew = false;
+        _vEditingId = null;
+        _vError = null;
+    }
+
+    private async Task SaveVenueAddAsync()
+    {
+        _vBusy = true; _vError = null;
+        var id = Guid.NewGuid().ToString("N")[..10];
+        var v = BuildVenue(id);
+        var (ok, error) = await Store.SaveAsync(data => { data.Venues.Add(v); return true; });
+        _vBusy = false;
+        if (ok) _vAddingNew = false;
+        else _vError = error;
+    }
+
+    private async Task SaveVenueEditAsync()
+    {
+        _vBusy = true; _vError = null;
+        var id = _vEditingId!;
+        var v = BuildVenue(id);
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var idx = data.Venues.FindIndex(x => x.Id == id);
+            if (idx < 0) return false;
+            data.Venues[idx] = v;
+            return true;
+        });
+        _vBusy = false;
+        if (ok) _vEditingId = null;
+        else _vError = error;
+    }
+
+    private async Task DeleteVenueAsync(string id)
+    {
+        await Store.SaveAsync(data => { data.Venues.RemoveAll(v => v.Id == id); return true; });
+    }
+
+    private Venue BuildVenue(string id) => new()
+    {
+        Id = id,
+        Name = _vfName!.Trim(),
+        Address = string.IsNullOrWhiteSpace(_vfAddress) ? null : _vfAddress.Trim(),
+        Notes = string.IsNullOrWhiteSpace(_vfNotes) ? null : _vfNotes.Trim()
+    };
+
+    private RenderFragment VenueFields() => __builder =>
+    {
+        <label class="form-field">
+            <span class="form-label">Nom *</span>
+            <input class="form-input" type="text" @bind="_vfName"
+                   placeholder="ex : Salle des fêtes de Pommiers" autocapitalize="words" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">📍 Adresse <span class="form-hint-inline">(optionnel — lien Maps)</span></span>
+            <input class="form-input" type="text" @bind="_vfAddress"
+                   placeholder="ex : 12 rue du Bourg, 69480 Pommiers" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">💡 Notes <span class="form-hint-inline">(optionnel)</span></span>
+            <textarea class="form-input form-textarea" @bind="_vfNotes" rows="2"
+                      placeholder="ex : Parking derrière la mairie, entrer par le portail rouge"></textarea>
+        </label>
+    };
 
     private RenderFragment ContactFields() => __builder =>
     {

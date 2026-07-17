@@ -207,6 +207,9 @@ public class WeddingStore(
     public Team? TeamById(string id) =>
         Data?.Teams.FirstOrDefault(t => t.Id == id);
 
+    public Venue? VenueById(string id) =>
+        Data?.Venues.FirstOrDefault(v => v.Id == id);
+
     /// <summary>Personnes assignées à une tâche (vide = tout le monde).</summary>
     public IEnumerable<Person> AssignedPeople(TaskItem task) =>
         task.AssignedTo

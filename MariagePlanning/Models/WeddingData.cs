@@ -7,8 +7,17 @@ public class WeddingData
     public List<Person> People { get; set; } = [];
     public List<Team> Teams { get; set; } = [];
     public List<Contact> Contacts { get; set; } = [];
+    public List<Venue> Venues { get; set; } = [];
     public List<WeddingDay> Days { get; set; } = [];
     public List<TodoItem> Todos { get; set; } = [];
+}
+
+public class Venue
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";       // ex : "Salle des fêtes de Pommiers"
+    public string? Address { get; set; }          // ex : "12 rue du Bourg, 69480 Pommiers" — lien Maps
+    public string? Notes { get; set; }
 }
 
 public class WeddingInfo
@@ -76,8 +85,11 @@ public class TaskItem
     /// <summary>Ids des contacts (prestataires) impliqués dans cette tâche.</summary>
     public List<string> ContactIds { get; set; } = [];
 
-    /// <summary>Adresse / lieu associé à la tâche (lien Google Maps affiché sur la carte).</summary>
+    /// <summary>Adresse libre (lien Google Maps). Utilisé si VenueId est null.</summary>
     public string? Location { get; set; }
+
+    /// <summary>Référence à un lieu prédéfini (WeddingData.Venues).</summary>
+    public string? VenueId { get; set; }
 
     public bool IsDone => Status == "done";
 }
