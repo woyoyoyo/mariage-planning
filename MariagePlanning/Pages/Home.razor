@@ -137,54 +137,30 @@ else
             var d = day;
 
             <div class="tile tile-day-wrap @(isWedding ? "tile-wedding" : isToday ? "tile-today" : "tile-day")">
-                @if (_quickAddDate == day.Date)
-                {
-                    @* Mini-formulaire d'ajout rapide *@
-                    <div class="tile-qa-form">
-                        <input class="tile-qa-input"
-                               @bind="_quickAddTitle"
-                               @bind:event="oninput"
-                               @onkeydown="@(async e => await HandleQAKey(e, d.Date))"
-                               placeholder="Titre de la tâche…"
-                               autocapitalize="sentences"
-                               @ref="_qaInputRef" />
-                        <div class="tile-qa-actions">
-                            <button class="tile-qa-ok"
-                                    @onclick="() => SaveQuickAsync(d.Date)"
-                                    disabled="@(string.IsNullOrWhiteSpace(_quickAddTitle) || _quickAddBusy)">
-                                @(_quickAddBusy ? "⏳" : "✓")
-                            </button>
-                            <button class="tile-qa-cancel" @onclick="CancelQA">✕</button>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <a class="tile-day-inner" href="jour/@day.Date.ToString("yyyy-MM-dd")">
-                        <div class="tile-day-num">@day.Date.Day</div>
-                        <div class="tile-sub">@day.Label</div>
-                        <div class="tile-day-footer">
-                            <span class="tile-tag">@_months[day.Date.Month - 1]</span>
-                            @if (_currentPerson is not null && myCount > 0)
-                            {
-                                <span class="tile-mine-badge">@myCount moi</span>
-                            }
-                            else if (_currentPerson is null && total > 0)
-                            {
-                                <span class="tile-tag">@total tâche@(total > 1 ? "s" : "")</span>
-                            }
-                        </div>
-                        @if (firstTask is not null)
+                <a class="tile-day-inner" href="jour/@day.Date.ToString("yyyy-MM-dd")">
+                    <div class="tile-day-num">@day.Date.Day</div>
+                    <div class="tile-sub">@day.Label</div>
+                    <div class="tile-day-footer">
+                        <span class="tile-tag">@_months[day.Date.Month - 1]</span>
+                        @if (_currentPerson is not null && myCount > 0)
                         {
-                            <div class="tile-day-first">⏰ @firstTask.Time</div>
+                            <span class="tile-mine-badge">@myCount moi</span>
                         }
-                    </a>
-                    @if (Store.CanEdit)
+                        else if (_currentPerson is null && total > 0)
+                        {
+                            <span class="tile-tag">@total tâche@(total > 1 ? "s" : "")</span>
+                        }
+                    </div>
+                    @if (firstTask is not null)
                     {
-                        <button class="tile-quick-add no-print"
-                                @onclick="() => OpenQA(d.Date)"
-                                title="Ajouter une tâche">➕</button>
+                        <div class="tile-day-first">⏰ @firstTask.Time</div>
                     }
+                </a>
+                @if (Store.CanEdit)
+                {
+                    <a class="tile-quick-add no-print"
+                       href="jour/@d.Date.ToString("yyyy-MM-dd")?add=1"
+                       title="Ajouter une tâche">➕</a>
                 }
             </div>
         }
@@ -270,12 +246,6 @@ else
     private bool _dayBusy;
     private string? _dayError;
 
-    // Ajout rapide sur une tuile de jour
-    private DateOnly? _quickAddDate;
-    private string    _quickAddTitle = "";
-    private bool      _quickAddBusy;
-    private ElementReference _qaInputRef;
-
     private Person?   _currentPerson;
     private int?      _countdownDays;
     private string    _countdownLabel = "jours";
@@ -284,7 +254,7 @@ else
     private int         _myTotal;
 
     private static readonly string[] _months =
-        ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+        ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Août", "Sep", "Oct", "Nov", "Déc"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -341,41 +311,6 @@ else
     {
         var shareUrl = Config.IsConfigured ? $"{Nav.BaseUri}rejoindre#{Config.GistId}" : null;
         await JS.InvokeVoidAsync("mariage.printPlan", shareUrl);
-    }
-
-    private void OpenQA(DateOnly date)
-    {
-        _quickAddDate  = date;
-        _quickAddTitle = "";
-        _quickAddBusy  = false;
-    }
-
-    private void CancelQA() => _quickAddDate = null;
-
-    private async Task HandleQAKey(KeyboardEventArgs e, DateOnly date)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_quickAddTitle)) await SaveQuickAsync(date);
-        if (e.Key == "Escape") CancelQA();
-    }
-
-    private async Task SaveQuickAsync(DateOnly date)
-    {
-        if (string.IsNullOrWhiteSpace(_quickAddTitle) || _quickAddBusy) return;
-        _quickAddBusy = true;
-        var title = _quickAddTitle.Trim();
-
-        var (ok, _) = await Store.SaveAsync(data =>
-        {
-            var day = data.Days.FirstOrDefault(d => d.Date == date);
-            if (day is null) return false;
-            day.Activities.Add(new TaskItem { Title = title });
-            return true;
-        });
-
-        _quickAddBusy  = false;
-        _quickAddDate  = null;
-        _quickAddTitle = "";
-        if (ok) Recompute();
     }
 
     private async Task AddDayAsync()

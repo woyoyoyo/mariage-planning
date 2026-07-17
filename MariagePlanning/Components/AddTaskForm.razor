@@ -106,7 +106,11 @@ else
     [Parameter, EditorRequired]
     public DateOnly Date { get; set; }
 
+    [Parameter]
+    public bool AutoOpen { get; set; }
+
     private bool _open;
+    private bool _autoOpenDone;
     private bool _busy;
     private string? _error;
     private string? _hint;
@@ -117,6 +121,15 @@ else
     private string? _location;
     private HashSet<string> _assigned = [];
     private HashSet<string> _contactIds = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AutoOpen && !_autoOpenDone && !_open)
+        {
+            _autoOpenDone = true;
+            await OpenAsync();
+        }
+    }
 
     private async Task OpenAsync()
     {
