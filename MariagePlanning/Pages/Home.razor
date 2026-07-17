@@ -200,6 +200,30 @@ else
             }
         </a>
 
+        @* ── Rappel todos à venir ─────────────────────────────────────── *@
+        @{
+            var upcomingTodos = Store.Data.Todos
+                .Where(t => !t.IsDone && t.DueDate.HasValue)
+                .OrderBy(t => t.DueDate)
+                .Take(4)
+                .ToList();
+        }
+        @if (upcomingTodos.Count > 0)
+        {
+            <div class="tile-full todo-upcoming no-print">
+                <div class="todo-upcoming-title">📋 Prochains à faire</div>
+                @foreach (var todo in upcomingTodos)
+                {
+                    var isLate = todo.DueDate < today2;
+                    var isSoon = !isLate && todo.DueDate <= today2.AddDays(7);
+                    <a class="todo-upcoming-row @(isLate ? "tup-late" : isSoon ? "tup-soon" : "")" href="todos">
+                        <span class="tup-title">@todo.Title</span>
+                        <span class="tup-date">@FrenchDate.Short(todo.DueDate!.Value)</span>
+                    </a>
+                }
+            </div>
+        }
+
         @* ── Actions ─────────────────────────────────────────────────── *@
         <button class="tile tile-action no-print" @onclick="ReloadAsync" disabled="@_reloading">
             <div class="tile-icon-lg">@(_reloading ? "⏳" : "🔄")</div>
