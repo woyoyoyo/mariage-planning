@@ -7,7 +7,7 @@
 
 <PageTitle>Mariage Planning</PageTitle>
 
-@* Bloc QR code — masqué à l'écran, affiché uniquement à l'impression *@
+@* Bloc QR — masqué à l'écran, visible à l'impression *@
 <div class="print-qr-block">
     <div id="print-qr"></div>
     <p class="print-qr-label">Scanner pour accéder au planning sur votre téléphone</p>
@@ -34,107 +34,191 @@
 }
 else
 {
-    @* ── En-tête compact ─────────────────────────────────────────────── *@
-    <header class="agenda-header">
-        <div class="agenda-title-row">
-            <h1 class="agenda-title">@Store.Data.Wedding.Name</h1>
-            @if (_countdownDays is not null)
-            {
-                <span class="agenda-countdown">J-@_countdownDays</span>
-            }
-            else if (Store.WeddingDate is not null)
-            {
-                <span class="agenda-countdown">💍</span>
-            }
-        </div>
+    <div class="tile-grid">
 
-        <div class="agenda-actions no-print">
-            <a class="agenda-btn @(_currentPerson is not null ? "agenda-btn-person" : "")"
-               href="moi"
-               style="@(_currentPerson is not null ? $"--person-color:{_currentPerson.Color}" : "")">
-                @if (_currentPerson is not null) { <span>👤 @_currentPerson.Name</span> }
-                else { <span>👤 Choisir mon profil</span> }
-            </a>
-            @if (_currentPerson is not null)
-            {
-                <button class="agenda-btn @(_onlyMe ? "agenda-btn-active" : "")"
-                        @onclick="() => _onlyMe = !_onlyMe">
-                    @(_onlyMe ? "✅ Moi seulement" : "Moi seulement")
-                </button>
-            }
-            <button class="agenda-btn" @onclick="ReloadAsync" disabled="@_reloading">
-                @(_reloading ? "⏳" : "🔄")
-            </button>
-            <button class="agenda-btn" @onclick="PrintAsync">🖨️</button>
-        </div>
-
-        <div class="agenda-status-row">
-            @switch (Store.Source)
-            {
-                case DataSource.Gist:
-                    <span class="agenda-status">✓ synchronisé @SyncTime</span>
-                    break;
-                case DataSource.Cache:
-                    <span class="agenda-status agenda-status-warn">📵 hors ligne — @SyncTime</span>
-                    break;
-                case DataSource.Demo:
-                    <span class="agenda-status">🧪 données de démo — <a href="parametres" style="color:inherit">configurer</a></span>
-                    break;
-            }
-        </div>
-    </header>
-
-    @* ── Planning complet ─────────────────────────────────────────────── *@
-    @foreach (var day in Store.OrderedDays)
-    {
-        var today     = DateOnly.FromDateTime(DateTime.Now);
-        var personId  = Config.CurrentPerson;
-
-        if (_onlyMe && personId is not null
-            && !day.Activities.Any(t => t.AssignedTo.Contains(personId)))
-            continue;
-
-        <DaySection Day="day"
-                    PersonId="personId"
-                    StrictFilter="@_onlyMe"
-                    InitiallyOpen="@(day.Date >= today)" />
-    }
-
-    @* ── Ajouter un jour ─────────────────────────────────────────────── *@
-    @if (Store.CanEdit)
-    {
-        @if (_addingDay)
-        {
-            <div class="add-form" style="margin-top:8px">
-                <label class="form-field">
-                    <span class="form-label">Date *</span>
-                    <input class="form-input" type="date" @bind="_newDayDate" />
-                </label>
-                <label class="form-field">
-                    <span class="form-label">Libellé du jour</span>
-                    <input class="form-input" type="text" @bind="_newDayLabel"
-                           placeholder="ex : J-2 — Préparation" autocapitalize="sentences" />
-                </label>
-                @if (_dayError is not null)
+        @* ── Compte à rebours ────────────────────────────────────────── *@
+        <div class="tile tile-full tile-hero">
+            <div class="tile-hero-top">
+                <div class="tile-hero-name">@Store.Data.Wedding.Name</div>
+                @switch (Store.Source)
                 {
-                    <div class="sync-status sync-warn">⚠️ @_dayError</div>
+                    case DataSource.Gist:
+                        <span class="tile-hero-badge tile-badge-ok">✓ sync</span>
+                        break;
+                    case DataSource.Cache:
+                        <span class="tile-hero-badge tile-badge-warn">📵 hors ligne</span>
+                        break;
+                    case DataSource.Demo:
+                        <span class="tile-hero-badge tile-badge-demo">démo</span>
+                        break;
                 }
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="() => _addingDay = false" disabled="@_dayBusy">Annuler</button>
-                    <button class="action-btn btn-refresh" @onclick="AddDayAsync"
-                            disabled="@(_dayBusy || _newDayDate is null)">
-                        @(_dayBusy ? "⏳…" : "📅 Ajouter ce jour")
-                    </button>
+            </div>
+            <div class="tile-countdown">@(_countdownDays?.ToString() ?? "🥂")</div>
+            <div class="tile-countdown-label">@_countdownLabel</div>
+        </div>
+
+        @* ── Prochaine tâche — contenu affiché directement ──────────── *@
+        @if (_nextTask is not null && _nextDay is not null)
+        {
+            <a class="tile tile-full tile-next" href="jour/@_nextDay.Date.ToString("yyyy-MM-dd")">
+                <div class="tile-eyebrow">
+                    @(_currentPerson is not null ? "⏭ MA PROCHAINE TÂCHE" : "⏭ PROCHAINE TÂCHE")
                 </div>
+                <div class="tile-next-title">@_nextTask.Title</div>
+                <div class="tile-next-meta">
+                    @if (_nextTask.Time is not null) { <span>⏰ @_nextTask.Time</span> }
+                    <span>@FrenchDate.Long(_nextDay.Date)</span>
+                    @if (!string.IsNullOrWhiteSpace(_nextTask.Location)) { <span>📍 @_nextTask.Location</span> }
+                </div>
+            </a>
+        }
+        else if (Store.Data.People.Count > 0 && _currentPerson is null)
+        {
+            <a class="tile tile-full tile-next-hint" href="moi">
+                <div class="tile-eyebrow">💡 ASTUCE</div>
+                <div class="tile-next-title">Sélectionne ton profil</div>
+                <div class="tile-next-meta"><span>pour voir ta prochaine tâche →</span></div>
+            </a>
+        }
+
+        @* ── Une tuile par jour — avec compteur de tâches ───────────── *@
+        @foreach (var day in Store.OrderedDays)
+        {
+            var total     = day.Activities.Count;
+            var isWedding = Store.IsWeddingDay(day);
+            var isToday   = day.Date == DateOnly.FromDateTime(DateTime.Now);
+            var myCount   = _currentPerson is null ? 0
+                            : day.Activities.Count(t => t.AssignedTo.Contains(_currentPerson.Id));
+            var firstTask = day.Activities
+                .Where(t => t.Time is not null)
+                .OrderBy(t => t.Time)
+                .FirstOrDefault();
+            var d = day;
+
+            <div class="tile tile-day-wrap @(isWedding ? "tile-wedding" : isToday ? "tile-today" : "tile-day")">
+                @if (_quickAddDate == day.Date)
+                {
+                    @* Mini-formulaire d'ajout rapide *@
+                    <div class="tile-qa-form">
+                        <input class="tile-qa-input"
+                               @bind="_quickAddTitle"
+                               @bind:event="oninput"
+                               @onkeydown="@(async e => await HandleQAKey(e, d.Date))"
+                               placeholder="Titre de la tâche…"
+                               autocapitalize="sentences"
+                               @ref="_qaInputRef" />
+                        <div class="tile-qa-actions">
+                            <button class="tile-qa-ok"
+                                    @onclick="() => SaveQuickAsync(d.Date)"
+                                    disabled="@(string.IsNullOrWhiteSpace(_quickAddTitle) || _quickAddBusy)">
+                                @(_quickAddBusy ? "⏳" : "✓")
+                            </button>
+                            <button class="tile-qa-cancel" @onclick="CancelQA">✕</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a class="tile-day-inner" href="jour/@day.Date.ToString("yyyy-MM-dd")">
+                        <div class="tile-day-num">@day.Date.Day</div>
+                        <div class="tile-sub">@day.Label</div>
+                        <div class="tile-day-footer">
+                            <span class="tile-tag">@_months[day.Date.Month - 1]</span>
+                            @if (_currentPerson is not null && myCount > 0)
+                            {
+                                <span class="tile-mine-badge">@myCount moi</span>
+                            }
+                            else if (_currentPerson is null && total > 0)
+                            {
+                                <span class="tile-tag">@total tâche@(total > 1 ? "s" : "")</span>
+                            }
+                        </div>
+                        @if (firstTask is not null)
+                        {
+                            <div class="tile-day-first">⏰ @firstTask.Time</div>
+                        }
+                    </a>
+                    @if (Store.CanEdit)
+                    {
+                        <button class="tile-quick-add no-print"
+                                @onclick="() => OpenQA(d.Date)"
+                                title="Ajouter une tâche">➕</button>
+                    }
+                }
             </div>
         }
-        else
+
+        @* ── Mon profil — lien vers planning perso ───────────────────── *@
+        <a class="tile @(_currentPerson is not null ? "tile-person" : "tile-muted")"
+           href="moi"
+           style="@(_currentPerson is not null ? $"--person-color:{_currentPerson.Color}" : "")">
+            @if (_currentPerson is not null)
+            {
+                <div class="tile-avatar">@_currentPerson.Name[0]</div>
+                <div class="tile-sub">@_currentPerson.Name</div>
+                @if (_myTotal > 0)
+                {
+                    <div class="tile-tag">@_myTotal tâche@(_myTotal > 1 ? "s" : "")</div>
+                }
+            }
+            else
+            {
+                <div class="tile-icon-lg">👤</div>
+                <div class="tile-tag">MON PLANNING</div>
+            }
+        </a>
+
+        @* ── Contacts ────────────────────────────────────────────────── *@
+        <a class="tile tile-muted" href="contacts">
+            <div class="tile-big-num">@Store.Data.Contacts.Count</div>
+            <div class="tile-tag">CONTACTS</div>
+        </a>
+
+        @* ── Actions ─────────────────────────────────────────────────── *@
+        <button class="tile tile-action no-print" @onclick="ReloadAsync" disabled="@_reloading">
+            <div class="tile-icon-lg">@(_reloading ? "⏳" : "🔄")</div>
+            <div class="tile-tag">ACTUALISER</div>
+        </button>
+        <button class="tile tile-action no-print" @onclick="PrintAsync">
+            <div class="tile-icon-lg">🖨️</div>
+            <div class="tile-tag">PDF</div>
+        </button>
+
+        @* ── Ajouter un jour ─────────────────────────────────────────── *@
+        @if (Store.CanEdit)
         {
-            <button class="action-btn btn-add home-add-day no-print" @onclick="() => _addingDay = true">
-                📅 Ajouter un jour
-            </button>
+            @if (_addingDay)
+            {
+                <div class="tile-full add-form">
+                    <label class="form-field">
+                        <span class="form-label">Date *</span>
+                        <input class="form-input" type="date" @bind="_newDayDate" />
+                    </label>
+                    <label class="form-field">
+                        <span class="form-label">Libellé du jour</span>
+                        <input class="form-input" type="text" @bind="_newDayLabel"
+                               placeholder="ex : J-2 — Préparation" autocapitalize="sentences" />
+                    </label>
+                    @if (_dayError is not null) { <div class="sync-status sync-warn">⚠️ @_dayError</div> }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="() => _addingDay = false" disabled="@_dayBusy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="AddDayAsync"
+                                disabled="@(_dayBusy || _newDayDate is null)">
+                            @(_dayBusy ? "⏳…" : "📅 Ajouter ce jour")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button class="tile tile-add-day tile-full no-print" @onclick="() => _addingDay = true">
+                    <div class="tile-icon-lg">📅</div>
+                    <div class="tile-tag">AJOUTER UN JOUR</div>
+                </button>
+            }
         }
-    }
+
+    </div>
 }
 
 @code {
@@ -145,12 +229,21 @@ else
     private bool _dayBusy;
     private string? _dayError;
 
-    private Person? _currentPerson;
-    private int? _countdownDays;
-    private bool _onlyMe;
+    // Ajout rapide sur une tuile de jour
+    private DateOnly? _quickAddDate;
+    private string    _quickAddTitle = "";
+    private bool      _quickAddBusy;
+    private ElementReference _qaInputRef;
 
-    private string SyncTime =>
-        Store.LastSync is { } d ? $"le {d:dd/MM} à {d:HH\\hmm}" : "";
+    private Person?   _currentPerson;
+    private int?      _countdownDays;
+    private string    _countdownLabel = "jours";
+    private WeddingDay? _nextDay;
+    private TaskItem?   _nextTask;
+    private int         _myTotal;
+
+    private static readonly string[] _months =
+        ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -162,24 +255,36 @@ else
 
     public void Dispose() => Store.Changed -= OnStoreChanged;
 
-    private void OnStoreChanged()
-    {
-        Recompute();
-        InvokeAsync(StateHasChanged);
-    }
+    private void OnStoreChanged() { Recompute(); InvokeAsync(StateHasChanged); }
 
     private void Recompute()
     {
-        _currentPerson = Config.CurrentPerson is { } id ? Store.PersonById(id) : null;
+        if (Store.Data is null) return;
 
+        // Countdown
+        var today = DateOnly.FromDateTime(DateTime.Now);
         if (Store.WeddingDate is { } wd)
         {
-            var today = DateOnly.FromDateTime(DateTime.Now);
-            _countdownDays = today < wd ? wd.DayNumber - today.DayNumber : (int?)null;
+            if (today < wd)      { _countdownDays = wd.DayNumber - today.DayNumber; _countdownLabel = "jours avant le mariage 💍"; }
+            else if (today == wd){ _countdownDays = null; _countdownLabel = "C'est le grand jour ! ✨"; }
+            else                 { _countdownDays = null; _countdownLabel = "Mariés ! 🥂"; }
         }
-        else
+
+        // Personne + total de mes tâches
+        _currentPerson = Config.CurrentPerson is { } id ? Store.PersonById(id) : null;
+        _myTotal = _currentPerson is null ? 0
+            : Store.Data.Days.Sum(d => d.Activities.Count(t => t.AssignedTo.Contains(_currentPerson.Id)));
+
+        // Prochaine tâche
+        _nextDay = null; _nextTask = null;
+        var personId = Config.CurrentPerson;
+        foreach (var day in Store.OrderedDays.Where(d => d.Date >= today))
         {
-            _countdownDays = null;
+            var task = day.Activities
+                .Where(t => !t.IsDone && (personId is null || WeddingStore.ConcernsPerson(t, personId)))
+                .OrderBy(t => t.Time ?? "99:99")
+                .FirstOrDefault();
+            if (task is not null) { _nextDay = day; _nextTask = task; break; }
         }
     }
 
@@ -193,21 +298,51 @@ else
 
     private async Task PrintAsync()
     {
-        var shareUrl = Config.IsConfigured
-            ? $"{Nav.BaseUri}rejoindre#{Config.GistId}"
-            : null;
+        var shareUrl = Config.IsConfigured ? $"{Nav.BaseUri}rejoindre#{Config.GistId}" : null;
         await JS.InvokeVoidAsync("mariage.printPlan", shareUrl);
+    }
+
+    private void OpenQA(DateOnly date)
+    {
+        _quickAddDate  = date;
+        _quickAddTitle = "";
+        _quickAddBusy  = false;
+    }
+
+    private void CancelQA() => _quickAddDate = null;
+
+    private async Task HandleQAKey(KeyboardEventArgs e, DateOnly date)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_quickAddTitle)) await SaveQuickAsync(date);
+        if (e.Key == "Escape") CancelQA();
+    }
+
+    private async Task SaveQuickAsync(DateOnly date)
+    {
+        if (string.IsNullOrWhiteSpace(_quickAddTitle) || _quickAddBusy) return;
+        _quickAddBusy = true;
+        var title = _quickAddTitle.Trim();
+
+        var (ok, _) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            if (day is null) return false;
+            day.Activities.Add(new TaskItem { Title = title });
+            return true;
+        });
+
+        _quickAddBusy  = false;
+        _quickAddDate  = null;
+        _quickAddTitle = "";
+        if (ok) Recompute();
     }
 
     private async Task AddDayAsync()
     {
         if (_newDayDate is null) return;
-        _dayBusy  = true;
-        _dayError = null;
+        _dayBusy = true; _dayError = null;
         var date  = DateOnly.FromDateTime(_newDayDate.Value);
-        var label = string.IsNullOrWhiteSpace(_newDayLabel)
-            ? FrenchDate.Long(date)
-            : _newDayLabel.Trim();
+        var label = string.IsNullOrWhiteSpace(_newDayLabel) ? FrenchDate.Long(date) : _newDayLabel.Trim();
 
         var (ok, error) = await Store.SaveAsync(data =>
         {
