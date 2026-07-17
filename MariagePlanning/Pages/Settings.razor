@@ -381,6 +381,13 @@
             <label class="show-token">
                 <input type="checkbox" @bind="_showGeminiKey" /> Afficher la clé
             </label>
+            <label class="form-field">
+                <span class="form-label">Modèle</span>
+                <input class="form-input" type="text" @bind="_geminiModel"
+                       placeholder="ex : gemini-2.5-flash"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" />
+                <span class="form-hint">Nom exact du modèle Gemini. Laisse vide pour revenir au défaut.</span>
+            </label>
             <div class="add-form-actions">
                 <button class="action-btn btn-refresh" @onclick="SaveGeminiKeyAsync" disabled="@_geminiKeySaving">
                     @(_geminiKeySaving ? "⏳…" : "💾 Enregistrer")
@@ -450,6 +457,7 @@
 
     // Gemini
     private string? _geminiKey;
+    private string  _geminiModel = "";
     private bool    _showGeminiKey;
     private bool    _geminiKeySaving;
     private bool    _geminiKeyTesting;
@@ -460,9 +468,10 @@
     {
         await Config.EnsureLoadedAsync();
         await Store.EnsureLoadedAsync();
-        _gistId    = Config.GistId;
-        _token     = Config.Token;
-        _geminiKey = Config.GeminiApiKey;
+        _gistId      = Config.GistId;
+        _token       = Config.Token;
+        _geminiKey   = Config.GeminiApiKey;
+        _geminiModel = Config.GeminiModel;
     }
 
     private async Task SaveGeminiKeyAsync()
@@ -470,6 +479,8 @@
         _geminiKeySaving  = true;
         _geminiKeyFeedback = null;
         await Config.SetGeminiApiKeyAsync(_geminiKey);
+        if (!string.IsNullOrWhiteSpace(_geminiModel))
+            await Config.SetGeminiModelAsync(_geminiModel);
         _geminiKeySaving = false;
         _geminiKeyOk     = Gemini.IsConfigured;
         _geminiKeyFeedback = Gemini.IsConfigured

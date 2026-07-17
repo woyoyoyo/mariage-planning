@@ -12,6 +12,7 @@ public class SettingsService(LocalStorageService storage)
     private const string CurrentPersonKey = "mp.currentPerson";
     private const string LockedTokenKey   = "mp.lockedToken";
     private const string GeminiKeyKey     = "mp.geminiKey";
+    private const string GeminiModelKey   = "mp.geminiModel";
 
     private bool _loaded;
 
@@ -19,6 +20,7 @@ public class SettingsService(LocalStorageService storage)
     public string? Token         { get; private set; }
     public string? CurrentPerson { get; private set; }
     public string? GeminiApiKey  { get; private set; }
+    public string  GeminiModel   { get; private set; } = "gemini-2.5-flash";
 
     /// <summary>Token chiffré reçu via un lien de partage — déverrouillable plus tard avec le mot de passe.</summary>
     public string? LockedToken { get; private set; }
@@ -36,6 +38,7 @@ public class SettingsService(LocalStorageService storage)
         CurrentPerson= await storage.GetAsync(CurrentPersonKey);
         LockedToken  = await storage.GetAsync(LockedTokenKey);
         GeminiApiKey = await storage.GetAsync(GeminiKeyKey);
+        GeminiModel  = await storage.GetAsync(GeminiModelKey) ?? GeminiModel;
         _loaded = true;
     }
 
@@ -65,6 +68,12 @@ public class SettingsService(LocalStorageService storage)
             await storage.RemoveAsync(LockedTokenKey);
         else
             await storage.SetAsync(LockedTokenKey, LockedToken);
+    }
+
+    public async Task SetGeminiModelAsync(string model)
+    {
+        GeminiModel = string.IsNullOrWhiteSpace(model) ? "gemini-2.5-flash" : model.Trim();
+        await storage.SetAsync(GeminiModelKey, GeminiModel);
     }
 
     public async Task SetGeminiApiKeyAsync(string? key)

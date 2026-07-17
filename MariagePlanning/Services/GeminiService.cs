@@ -22,7 +22,8 @@ public class AssistantAction
 public class GeminiService(SettingsService settings)
 {
     private static readonly HttpClient _http = new();
-    private const string ApiBase = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    public const string DefaultModel = "gemini-2.5-flash";
+    private string ApiUrl => $"https://generativelanguage.googleapis.com/v1beta/models/{settings.GeminiModel}:generateContent";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(settings.GeminiApiKey);
 
@@ -43,7 +44,7 @@ public class GeminiService(SettingsService settings)
             generationConfig = new { temperature = 0.4, maxOutputTokens = 1024 }
         };
 
-        var resp = await _http.PostAsJsonAsync($"{ApiBase}?key={key}", body);
+        var resp = await _http.PostAsJsonAsync($"{ApiUrl}?key={key}", body);
 
         if (!resp.IsSuccessStatusCode)
         {
