@@ -22,7 +22,7 @@ public class AssistantAction
 public class GeminiService(SettingsService settings)
 {
     private static readonly HttpClient _http = new();
-    public const string DefaultModel = "gemini-2.5-flash";
+    public const string DefaultModel = "gemini-3.5-flash";
     private string ApiUrl => $"https://generativelanguage.googleapis.com/v1beta/models/{settings.GeminiModel}:generateContent";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(settings.GeminiApiKey);
@@ -113,6 +113,18 @@ public class GeminiService(SettingsService settings)
         if (data.People.Count == 0) sb.AppendLine("  (aucune personne définie)");
         sb.AppendLine();
 
+        if (data.Teams.Count > 0)
+        {
+            sb.AppendLine("ÉQUIPES (utilise l'ID d'équipe dans assignedTo, l'app résoudra les membres) :");
+            foreach (var t in data.Teams)
+            {
+                var members = t.MemberIds
+                    .Select(mid => data.People.FirstOrDefault(p => p.Id == mid)?.Name ?? mid);
+                sb.AppendLine($"  - id \"{t.Id}\" → {t.Name} ({string.Join(", ", members)})");
+            }
+            sb.AppendLine();
+        }
+
         sb.AppendLine("PLANNING COMPLET :");
         foreach (var day in data.Days.OrderBy(d => d.Date))
         {
@@ -140,9 +152,12 @@ public class GeminiService(SettingsService settings)
         sb.AppendLine("INSTRUCTIONS :");
         sb.AppendLine("- Pour CRÉER une tâche : réponds d'abord en texte naturel, PUIS ajoute un bloc JSON :");
         sb.AppendLine("  ```json");
-        sb.AppendLine("  {\"action\":\"add_task\",\"date\":\"YYYY-MM-DD\",\"title\":\"...\",\"time\":\"HH:MM ou null\",\"location\":null,\"notes\":null,\"assignedTo\":[\"id1\"]}");
+        sb.AppendLine("  {\"action\":\"add_task\",\"date\":\"YYYY-MM-DD\",\"title\":\"...\",\"time\":\"HH:MM ou null\",\"location\":null,\"notes\":null,\"assignedTo\":[\"id_personne_ou_equipe\"]}");
         sb.AppendLine("  ```");
+        sb.AppendLine("- assignedTo peut contenir des IDs de personnes ET/OU des IDs d'équipes.");
         sb.AppendLine("- Pour 'tout le monde' : assignedTo = []");
+        sb.AppendLine("- Si la tâche concerne une équipe connue, utilise son ID d'équipe directement.");
+        sb.AppendLine("- Si l'assignation n'est pas claire : DEMANDE si c'est pour tout le monde, une personne ou une équipe, en listant les options disponibles.");
         sb.AppendLine("- Si la date ou le titre manquent : POSE UNE QUESTION avant d'émettre le JSON.");
         sb.AppendLine("- Pour LIRE le planning : réponds en texte naturel, liste les tâches pertinentes.");
         sb.AppendLine("- Tu ne peux pas modifier ni supprimer des tâches existantes.");
@@ -150,13 +165,36 @@ public class GeminiService(SettingsService settings)
         return sb.ToString();
     }
 
-    /// <summary>Résout un nom ou un ID en ID de personne (tolérant aux fautes mineures).</summary>
-    public static string? ResolvePersonId(string nameOrId, IEnumerable<Person> people)
+    /// <summary>
+    /// Résout une liste d'IDs (personnes OU équipes) en liste de person IDs uniques.
+    /// </summary>
+    public static List<string> ResolveAssignedIds(
+        IEnumerable<string> raw,
+        IEnumerable<Person> people,
+        IEnumerable<Team>   teams)
     {
-        var list = people.ToList();
-        var byId = list.FirstOrDefault(p => p.Id == nameOrId);
-        if (byId is not null) return byId.Id;
-        var byName = list.FirstOrDefault(p => p.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
-        return byName?.Id;
+        var peopleList = people.ToList();
+        var teamsList  = teams.ToList();
+        var result     = new HashSet<string>();
+
+        foreach (var nameOrId in raw)
+        {
+            // Cherche une équipe (par ID ou nom)
+            var team = teamsList.FirstOrDefault(t => t.Id == nameOrId)
+                    ?? teamsList.FirstOrDefault(t => t.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
+            if (team is not null)
+            {
+                foreach (var mid in team.MemberIds) result.Add(mid);
+                continue;
+            }
+
+            // Cherche une personne (par ID ou nom)
+            var person = peopleList.FirstOrDefault(p => p.Id == nameOrId)
+                      ?? peopleList.FirstOrDefault(p => p.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
+            if (person is not null)
+                result.Add(person.Id);
+        }
+
+        return [.. result];
     }
 }

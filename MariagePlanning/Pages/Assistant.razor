@@ -183,12 +183,11 @@ else
             return;
         }
 
-        // Résoudre les IDs de personnes (Gemini peut renvoyer un nom au lieu d'un ID)
-        var assignedIds = (action.AssignedTo ?? [])
-            .Select(x => GeminiService.ResolvePersonId(x, Store.Data!.People) ?? x)
-            .Where(id => Store.Data!.People.Any(p => p.Id == id))
-            .Distinct()
-            .ToList();
+        // Résoudre les IDs (personnes ET équipes → person IDs)
+        var assignedIds = GeminiService.ResolveAssignedIds(
+            action.AssignedTo ?? [],
+            Store.Data!.People,
+            Store.Data!.Teams);
 
         var title = action.Title?.Trim() ?? "Tâche sans titre";
         var time  = string.IsNullOrWhiteSpace(action.Time) || action.Time == "null" ? null : action.Time;
@@ -214,7 +213,8 @@ else
         {
             var who = assignedIds.Count == 0
                 ? "tout le monde"
-                : string.Join(", ", assignedIds.Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+                : string.Join(", ", assignedIds
+                    .Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
             var timeStr = time is not null ? $" à {time}" : "";
             _messages.Add(new ChatMessage($"✅ Tâche ajoutée : « {title} »{timeStr} le {date:d MMMM} pour {who}.", IsUser: false, IsAction: true));
         }

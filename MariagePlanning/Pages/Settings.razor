@@ -494,17 +494,14 @@
         _geminiKeyFeedback = null;
         try
         {
-            var result = await Gemini.ChatAsync(
-                "Tu es un assistant. Réponds uniquement avec le mot : OK",
-                [],
-                "Test de connexion.");
+            await Gemini.ChatAsync("Réponds uniquement avec le mot : OK", [], "Test de connexion.");
             _geminiKeyOk       = true;
-            _geminiKeyFeedback = $"✅ Connexion Gemini OK — la clé est valide.";
+            _geminiKeyFeedback = $"✅ Connexion OK — modèle : {Config.GeminiModel}";
         }
         catch (Exception ex)
         {
             _geminiKeyOk       = false;
-            _geminiKeyFeedback = $"⚠️ Erreur : {ex.Message}";
+            _geminiKeyFeedback = $"⚠️ {ex.Message}";
         }
         finally { _geminiKeyTesting = false; }
     }

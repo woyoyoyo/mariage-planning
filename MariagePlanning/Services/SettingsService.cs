@@ -20,7 +20,7 @@ public class SettingsService(LocalStorageService storage)
     public string? Token         { get; private set; }
     public string? CurrentPerson { get; private set; }
     public string? GeminiApiKey  { get; private set; }
-    public string  GeminiModel   { get; private set; } = "gemini-2.5-flash";
+    public string  GeminiModel   { get; private set; } = "gemini-3.5-flash";
 
     /// <summary>Token chiffré reçu via un lien de partage — déverrouillable plus tard avec le mot de passe.</summary>
     public string? LockedToken { get; private set; }
