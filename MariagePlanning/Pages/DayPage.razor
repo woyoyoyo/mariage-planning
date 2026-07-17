@@ -21,7 +21,15 @@ else
 {
     <div class="day-page-topbar no-print">
         <a class="day-page-back" href="">← Accueil</a>
-        <button class="btn-share-day" @onclick="ShareAsync" title="Partager ce jour">📤</button>
+        <div class="day-topbar-right">
+            <div class="view-switch">
+                <button class="view-switch-btn @(!_calView ? "vs-active" : "")"
+                        @onclick='() => _calView = false' title="Vue liste">📋</button>
+                <button class="view-switch-btn @(_calView ? "vs-active" : "")"
+                        @onclick='() => _calView = true' title="Vue calendrier">📆</button>
+            </div>
+            <button class="btn-share-day" @onclick="ShareAsync" title="Partager ce jour">📤</button>
+        </div>
     </div>
 
     <header class="page-header @(IsWeddingDay ? "day-header-wedding" : "")">
@@ -37,43 +45,102 @@ else
         </div>
     </header>
 
-    @* Tâches sans horaire *@
-    @if (UntimedTasks.Any())
+    @if (!_calView)
     {
-        <div class="timeline-allday">
-            <span class="timeline-allday-label">📌 Sans horaire</span>
-            @foreach (var task in UntimedTasks)
-            {
-                <TaskCard Task="task" Date="_day.Date" />
-            }
-        </div>
-    }
+        @* ── Vue liste ──────────────────────────────────────────────────── *@
+        @if (UntimedTasks.Any())
+        {
+            <div class="timeline-allday">
+                <span class="timeline-allday-label">📌 Sans horaire</span>
+                @foreach (var task in UntimedTasks)
+                {
+                    <TaskCard Task="task" Date="_day.Date" />
+                }
+            </div>
+        }
 
-    @* Timeline des tâches avec horaire *@
-    @if (TimedGroups.Any())
-    {
-        <div class="timeline">
-            @foreach (var group in TimedGroups)
-            {
-                <div class="timeline-slot">
-                    <div class="timeline-left">
-                        <span class="timeline-time-label">@group.Key</span>
-                        <span class="timeline-dot"></span>
+        @if (TimedGroups.Any())
+        {
+            <div class="timeline">
+                @foreach (var group in TimedGroups)
+                {
+                    <div class="timeline-slot">
+                        <div class="timeline-left">
+                            <span class="timeline-time-label">@group.Key</span>
+                            <span class="timeline-dot"></span>
+                        </div>
+                        <div class="timeline-right">
+                            @foreach (var task in group)
+                            {
+                                <TaskCard Task="task" Date="_day.Date" HideTime="true" />
+                            }
+                        </div>
                     </div>
-                    <div class="timeline-right">
-                        @foreach (var task in group)
+                }
+            </div>
+        }
+
+        @if (!_day.Activities.Any())
+        {
+            <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+        }
+    }
+    else
+    {
+        <div class="cal-grid">
+            @if (UntimedTasks.Any())
+            {
+                <div class="cal-row cal-row-untimed">
+                    <div class="cal-hour">📌</div>
+                    <div class="cal-tasks">
+                        @foreach (var task in UntimedTasks)
                         {
-                            <TaskCard Task="task" Date="_day.Date" HideTime="true" />
+                            var t0 = task;
+                            <div class="cal-chip @(t0.IsDone ? "cal-chip-done" : "")"
+                                 @onclick="() => CalToggleDoneAsync(t0)">
+                                <span class="cal-chip-check">@(t0.IsDone ? "✅" : "⬜")</span>
+                                <span class="cal-chip-title">@t0.Title</span>
+                                @if (t0.AssignedTo.Count > 0)
+                                {
+                                    var who = Store.AssignedPeople(t0).FirstOrDefault();
+                                    <span class="cal-chip-who">@(who?.Name)@(t0.AssignedTo.Count > 1 ? $" +{t0.AssignedTo.Count - 1}" : "")</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @foreach (var hour in CalHours)
+            {
+                var slotTasks = CalTasksByHour.TryGetValue(hour, out var ts) ? ts : [];
+                <div class="cal-row @(slotTasks.Count == 0 ? "cal-row-empty" : "")">
+                    <div class="cal-hour">@($"{hour:D2}h")</div>
+                    <div class="cal-tasks">
+                        @foreach (var task in slotTasks)
+                        {
+                            var t1 = task;
+                            <div class="cal-chip @(t1.IsDone ? "cal-chip-done" : "")"
+                                 @onclick="() => CalToggleDoneAsync(t1)">
+                                <span class="cal-chip-check">@(t1.IsDone ? "✅" : "⬜")</span>
+                                <span class="cal-chip-time">@t1.Time</span>
+                                <span class="cal-chip-title">@t1.Title</span>
+                                @if (t1.AssignedTo.Count > 0)
+                                {
+                                    var who = Store.AssignedPeople(t1).FirstOrDefault();
+                                    <span class="cal-chip-who">@(who?.Name)@(t1.AssignedTo.Count > 1 ? $" +{t1.AssignedTo.Count - 1}" : "")</span>
+                                }
+                            </div>
                         }
                     </div>
                 </div>
             }
         </div>
-    }
 
-    @if (!_day.Activities.Any())
-    {
-        <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+        @if (!_day.Activities.Any())
+        {
+            <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+        }
     }
 
     <AddTaskForm Date="_day.Date" />
@@ -131,6 +198,8 @@ else
     private bool _ready;
     private WeddingDay? _day;
 
+    private bool _calView;
+
     private bool _editingLabel;
     private string? _editLabel;
     private bool _confirmingDelete;
@@ -152,6 +221,45 @@ else
 
     private int TotalCount => _day?.Activities.Count ?? 0;
     private int DoneCount => _day?.Activities.Count(t => t.IsDone) ?? 0;
+
+    // ── Vue calendrier ───────────────────────────────────────────────────────
+
+    private IReadOnlyList<int> CalHours
+    {
+        get
+        {
+            if (_day is null) return [];
+            var timed = _day.Activities.Where(t => t.Time is not null).ToList();
+            if (!timed.Any()) return [];
+            var hours = timed.Select(t => int.Parse(t.Time!.Split(':')[0]));
+            var min = hours.Min();
+            var max = hours.Max();
+            return Enumerable.Range(min, max - min + 2).ToArray();
+        }
+    }
+
+    private Dictionary<int, List<TaskItem>> CalTasksByHour =>
+        _day?.Activities
+            .Where(t => t.Time is not null)
+            .GroupBy(t => int.Parse(t.Time!.Split(':')[0]))
+            .ToDictionary(g => g.Key, g => g.OrderBy(t => t.Time).ToList())
+        ?? [];
+
+    private async Task CalToggleDoneAsync(TaskItem task)
+    {
+        if (!Store.CanEdit) return;
+        var id   = task.Id;
+        var date = _day!.Date;
+        var next = task.IsDone ? "todo" : "done";
+        await Store.SaveAsync(data =>
+        {
+            var t = data.Days.FirstOrDefault(d => d.Date == date)
+                        ?.Activities.FirstOrDefault(t => t.Id == id);
+            if (t is null) return false;
+            t.Status = next;
+            return true;
+        });
+    }
 
     protected override async Task OnInitializedAsync()
     {
