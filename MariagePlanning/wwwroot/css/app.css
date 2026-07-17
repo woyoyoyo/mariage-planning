@@ -2440,6 +2440,133 @@ button.tile:disabled { opacity: 0.45; }
    Assistant IA — chat
    ========================================================================== */
 
+/* ==========================================================================
+   Barre d'onglets (Contacts)
+   ========================================================================== */
+
+.tab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 0 16px 8px;
+    border-bottom: 2px solid var(--color-border);
+    margin-bottom: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 9px 12px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-soft);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s;
+}
+
+.tab:hover { color: var(--color-primary); }
+
+.tab-active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--color-border);
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-soft);
+}
+
+.tab-active .tab-count {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* ── Cartes export personne ─────────────────────────────────────────────── */
+
+.person-export-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 16px;
+}
+
+.person-export-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.person-export-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.person-export-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-export-name {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--color-text);
+}
+
+.person-export-meta {
+    font-size: 12px;
+    color: var(--color-text-soft);
+    margin-top: 2px;
+}
+
+.person-export-phone {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.btn-export-person {
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 6px 12px;
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-export-person:hover { opacity: .85; }
+
 .chat-unconfigured {
     display: flex;
     flex-direction: column;

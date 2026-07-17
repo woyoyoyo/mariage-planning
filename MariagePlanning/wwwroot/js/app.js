@@ -26,6 +26,9 @@ window.mariage = {
         }
     },
 
+    // Impression simple sans QR ni manipulation des details
+    printNow: () => { window.print(); },
+
     // Ouvre tous les jours, génère le QR si besoin, imprime, puis restaure l'état
     printPlan: (shareUrl) => {
         const qrEl = document.getElementById('print-qr');

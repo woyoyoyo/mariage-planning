@@ -1,13 +1,33 @@
 @page "/contacts"
 @implements IDisposable
 @inject WeddingStore Store
+@inject SettingsService Config
+@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — Contacts</PageTitle>
 
 <header class="page-header">
     <h1>📇 Contacts</h1>
-    <div class="wedding-sub">Prestataires, lieux &amp; personnes à contacter</div>
 </header>
+
+@* ── Barre d'onglets ────────────────────────────────────────────────────── *@
+@if (Store.Data is not null)
+{
+    <div class="tab-bar no-print">
+        <button class="tab @(_tab == Tab.Contacts ? "tab-active" : "")" @onclick='() => _tab = Tab.Contacts'>
+            📇 Prestataires
+            <span class="tab-count">@Store.Data.Contacts.Count</span>
+        </button>
+        <button class="tab @(_tab == Tab.Personnes ? "tab-active" : "")" @onclick='() => _tab = Tab.Personnes'>
+            👤 Personnes
+            <span class="tab-count">@Store.Data.People.Count</span>
+        </button>
+        <button class="tab @(_tab == Tab.Equipes ? "tab-active" : "")" @onclick='() => _tab = Tab.Equipes'>
+            👥 Équipes
+            <span class="tab-count">@Store.Data.Teams.Count</span>
+        </button>
+    </div>
+}
 
 @if (Store.Data is null)
 {
@@ -15,101 +35,258 @@
 }
 else
 {
-    @foreach (var contact in Store.Data.Contacts)
+    <div class="no-print">
+
+    @* ── Onglet Prestataires ────────────────────────────────────────────── *@
+    @if (_tab == Tab.Contacts)
     {
-        var cid = contact.Id;
-        @if (_editingId == cid)
+        @foreach (var contact in Store.Data.Contacts)
         {
-            <div class="add-form edit-form contact-form">
-                @ContactFields()
-                @if (_error is not null)
-                {
-                    <div class="sync-status sync-warn">⚠️ @_error</div>
-                }
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
-                    <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
-                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
-                        @(_busy ? "⏳…" : "💾 Enregistrer")
-                    </button>
+            var cid = contact.Id;
+            @if (_editingId == cid)
+            {
+                <div class="add-form edit-form contact-form">
+                    @ContactFields()
+                    @if (_error is not null)
+                    {
+                        <div class="sync-status sync-warn">⚠️ @_error</div>
+                    }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
+                                disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                            @(_busy ? "⏳…" : "💾 Enregistrer")
+                        </button>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="contact-card">
+                    <div class="contact-card-head">
+                        <span class="contact-name">@contact.Name</span>
+                        @if (Store.CanEdit)
+                        {
+                            <div class="people-row-actions">
+                                <button class="btn-card-icon" @onclick="() => StartEdit(contact)" title="Modifier">✏️</button>
+                                <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(cid)" title="Supprimer">🗑️</button>
+                            </div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(contact.ContactPerson))
+                    {
+                        <div class="contact-detail">👤 @contact.ContactPerson</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(contact.Phone))
+                    {
+                        <a href="tel:@contact.Phone" class="contact-action">📞 @contact.Phone</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(contact.Address))
+                    {
+                        <a href="@MapsUrl(contact.Address)" target="_blank" rel="noopener" class="contact-action">
+                            📍 @contact.Address
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(contact.Notes))
+                    {
+                        <p class="contact-notes">💡 @contact.Notes</p>
+                    }
+                    @foreach (var lnk in contact.Links.Where(l => !string.IsNullOrWhiteSpace(l)))
+                    {
+                        <a href="@lnk" target="_blank" rel="noopener" class="contact-action contact-link-url">
+                            🔗 @DisplayLink(lnk)
+                        </a>
+                    }
+                </div>
+            }
+        }
+
+        @if (Store.Data.Contacts.Count == 0 && !Store.CanEdit)
+        {
+            <div class="empty-message">Aucun prestataire pour l'instant.</div>
+        }
+
+        @if (Store.CanEdit)
+        {
+            @if (_addingNew)
+            {
+                <div class="add-form contact-form">
+                    @ContactFields()
+                    @if (_error is not null)
+                    {
+                        <div class="sync-status sync-warn">⚠️ @_error</div>
+                    }
+                    <div class="add-form-actions">
+                        <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                        <button class="action-btn btn-refresh" @onclick="SaveAddAsync"
+                                disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                            @(_busy ? "⏳…" : "➕ Ajouter")
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (_editingId is null)
+            {
+                <button class="action-btn btn-add contact-add-btn" @onclick="StartAdd">
+                    ➕ Ajouter un prestataire
+                </button>
+            }
+        }
+    }
+
+    @* ── Onglet Personnes ──────────────────────────────────────────────── *@
+    else if (_tab == Tab.Personnes)
+    {
+        @if (Store.Data.People.Count == 0)
+        {
+            <div class="empty-message">Aucune personne configurée.</div>
         }
         else
         {
-            <div class="contact-card">
-                <div class="contact-card-head">
-                    <span class="contact-name">@contact.Name</span>
-                    @if (Store.CanEdit)
-                    {
-                        <div class="people-row-actions">
-                            <button class="btn-card-icon" @onclick="() => StartEdit(contact)" title="Modifier">✏️</button>
-                            <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(cid)" title="Supprimer">🗑️</button>
+            <div class="person-export-list">
+                @foreach (var person in Store.Data.People)
+                {
+                    var pid = person.Id;
+                    var taskCount = Store.OrderedDays.Sum(d =>
+                        d.Activities.Count(t => WeddingStore.ConcernsPerson(t, pid)));
+                    <div class="person-export-card">
+                        <div class="person-export-avatar" style="background:@person.Color">
+                            @person.Name[0]
                         </div>
-                    }
-                </div>
-                @if (!string.IsNullOrWhiteSpace(contact.ContactPerson))
-                {
-                    <div class="contact-detail">👤 @contact.ContactPerson</div>
-                }
-                @if (!string.IsNullOrWhiteSpace(contact.Phone))
-                {
-                    <a href="tel:@contact.Phone" class="contact-action">📞 @contact.Phone</a>
-                }
-                @if (!string.IsNullOrWhiteSpace(contact.Address))
-                {
-                    <a href="@MapsUrl(contact.Address)" target="_blank" rel="noopener" class="contact-action">
-                        📍 @contact.Address
-                    </a>
-                }
-                @if (!string.IsNullOrWhiteSpace(contact.Notes))
-                {
-                    <p class="contact-notes">💡 @contact.Notes</p>
-                }
-                @foreach (var lnk in contact.Links.Where(l => !string.IsNullOrWhiteSpace(l)))
-                {
-                    <a href="@lnk" target="_blank" rel="noopener" class="contact-action contact-link-url">
-                        🔗 @DisplayLink(lnk)
-                    </a>
+                        <div class="person-export-info">
+                            <div class="person-export-name">@person.Name</div>
+                            <div class="person-export-meta">
+                                @taskCount tâche@(taskCount > 1 ? "s" : "")
+                                @if (!string.IsNullOrWhiteSpace(person.Phone))
+                                {
+                                    <span> · </span>
+                                    <a href="tel:@person.Phone" class="person-export-phone">@person.Phone</a>
+                                }
+                            </div>
+                        </div>
+                        <button class="action-btn btn-export-person"
+                                @onclick="() => ExportPersonAsync(pid)"
+                                title="Imprimer le planning de @person.Name">
+                            📄 Exporter
+                        </button>
+                    </div>
                 }
             </div>
         }
-    }
-
-    @if (Store.Data.Contacts.Count == 0 && !Store.CanEdit)
-    {
-        <div class="empty-message">Aucun contact pour l'instant.</div>
-    }
-
-    @if (Store.CanEdit)
-    {
-        @if (_addingNew)
+        @if (Store.CanEdit)
         {
-            <div class="add-form contact-form">
-                @ContactFields()
-                @if (_error is not null)
-                {
-                    <div class="sync-status sync-warn">⚠️ @_error</div>
-                }
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
-                    <button class="action-btn btn-refresh" @onclick="SaveAddAsync"
-                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
-                        @(_busy ? "⏳…" : "➕ Ajouter")
-                    </button>
+            <a class="action-btn btn-clear" href="personnes" style="display:inline-block;text-align:center;margin-top:8px">
+                ✏️ Gérer les personnes →
+            </a>
+        }
+    }
+
+    @* ── Onglet Équipes ────────────────────────────────────────────────── *@
+    else
+    {
+        @if (Store.Data.Teams.Count == 0)
+        {
+            <div class="empty-message">Aucune équipe configurée.</div>
+        }
+        else
+        {
+            @foreach (var team in Store.Data.Teams)
+            {
+                var members = team.MemberIds
+                    .Select(mid => Store.PersonById(mid)?.Name)
+                    .Where(n => n is not null)
+                    .ToList();
+                <div class="contact-card">
+                    <div class="contact-card-head">
+                        <span class="person-badge" style="--person-color:@team.Color">@team.Name</span>
+                    </div>
+                    <div class="contact-detail">
+                        👥 @(members.Count == 0 ? "Aucun membre" : string.Join(", ", members))
+                    </div>
                 </div>
-            </div>
+            }
         }
-        else if (_editingId is null)
+        @if (Store.CanEdit)
         {
-            <button class="action-btn btn-add contact-add-btn" @onclick="StartAdd">
-                ➕ Ajouter un contact
-            </button>
+            <a class="action-btn btn-clear" href="personnes" style="display:inline-block;text-align:center;margin-top:8px">
+                ✏️ Gérer les équipes →
+            </a>
         }
+    }
+
+    </div>
+
+    @* ── Planning par personne pour impression ──────────────────────────── *@
+    @if (_printPersonId is not null)
+    {
+        var person = Store.PersonById(_printPersonId);
+        <div class="print-planning">
+            <h1 class="print-planning-title">Planning — @person?.Name</h1>
+            <p class="print-planning-date">Imprimé le @DateTime.Now.ToString("d MMMM yyyy")</p>
+            @foreach (var day in Store.OrderedDays)
+            {
+                var pid2 = _printPersonId;
+                var tasks = day.Activities
+                    .Where(t => WeddingStore.ConcernsPerson(t, pid2))
+                    .OrderBy(t => t.Time ?? "99:99")
+                    .ToList();
+                @if (tasks.Count > 0)
+                {
+                    <div class="print-day-block">
+                        <h2 class="print-day-heading">
+                            @FrenchDate.Long(day.Date) — @day.Label
+                            @if (Store.IsWeddingDay(day)) { <span> ✨ Jour J</span> }
+                        </h2>
+                        @foreach (var task in tasks)
+                        {
+                            <div class="print-task-row">
+                                <span class="print-task-time">@(task.Time ?? "—")</span>
+                                <span class="print-task-title">@task.Title</span>
+                                @if (!string.IsNullOrWhiteSpace(task.Location))
+                                {
+                                    <span class="print-task-loc">📍 @task.Location</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(task.Notes))
+                            {
+                                <div class="print-task-notes">💡 @task.Notes</div>
+                            }
+                        }
+                    </div>
+                }
+            }
+        </div>
     }
 }
 
 @code {
+    private enum Tab { Contacts, Personnes, Equipes }
+    private Tab _tab = Tab.Contacts;
+
+    // ── Impression par personne ───────────────────────────────────────────────
+
+    private string? _printPersonId;
+    private bool    _pendingPrint;
+
+    private void ExportPersonAsync(string personId)
+    {
+        _printPersonId = personId;
+        _pendingPrint  = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingPrint)
+        {
+            _pendingPrint = false;
+            await JS.InvokeVoidAsync("mariage.printNow");
+            _printPersonId = null;
+            StateHasChanged();
+        }
+    }
+
+    // ── Contacts ─────────────────────────────────────────────────────────────
+
     private bool _addingNew;
     private string? _editingId;
     private bool _busy;
@@ -137,28 +314,17 @@ else
     {
         _addingNew = true;
         _editingId = null;
-        _fName = null;
-        _fPerson = null;
-        _fPhone = null;
-        _fAddress = null;
-        _fNotes = null;
-        _fLinks = [];
-        _newLinkInput = null;
-        _error = null;
+        _fName = null; _fPerson = null; _fPhone = null; _fAddress = null; _fNotes = null;
+        _fLinks = []; _newLinkInput = null; _error = null;
     }
 
     private void StartEdit(Contact c)
     {
         _editingId = c.Id;
         _addingNew = false;
-        _fName = c.Name;
-        _fPerson = c.ContactPerson;
-        _fPhone = c.Phone;
-        _fAddress = c.Address;
-        _fNotes = c.Notes;
-        _fLinks = [.. c.Links];
-        _newLinkInput = null;
-        _error = null;
+        _fName = c.Name; _fPerson = c.ContactPerson; _fPhone = c.Phone;
+        _fAddress = c.Address; _fNotes = c.Notes;
+        _fLinks = [.. c.Links]; _newLinkInput = null; _error = null;
     }
 
     private void CancelForm()
@@ -179,19 +345,11 @@ else
 
     private async Task SaveAddAsync()
     {
-        _busy = true;
-        _error = null;
+        _busy = true; _error = null;
         CommitPendingLink();
-
         var id = Guid.NewGuid().ToString("N")[..10];
         var c = BuildContact(id);
-
-        var (ok, error) = await Store.SaveAsync(data =>
-        {
-            data.Contacts.Add(c);
-            return true;
-        });
-
+        var (ok, error) = await Store.SaveAsync(data => { data.Contacts.Add(c); return true; });
         _busy = false;
         if (ok) { _addingNew = false; _fLinks = []; }
         else _error = error;
@@ -199,13 +357,10 @@ else
 
     private async Task SaveEditAsync()
     {
-        _busy = true;
-        _error = null;
+        _busy = true; _error = null;
         CommitPendingLink();
-
         var id = _editingId!;
         var c = BuildContact(id);
-
         var (ok, error) = await Store.SaveAsync(data =>
         {
             var idx = data.Contacts.FindIndex(x => x.Id == id);
@@ -213,7 +368,6 @@ else
             data.Contacts[idx] = c;
             return true;
         });
-
         _busy = false;
         if (ok) _editingId = null;
         else _error = error;
@@ -221,11 +375,7 @@ else
 
     private async Task DeleteAsync(string id)
     {
-        var (_, _) = await Store.SaveAsync(data =>
-        {
-            data.Contacts.RemoveAll(c => c.Id == id);
-            return true;
-        });
+        await Store.SaveAsync(data => { data.Contacts.RemoveAll(c => c.Id == id); return true; });
     }
 
     private void CommitPendingLink()
