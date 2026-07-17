@@ -22,6 +22,24 @@ else
     <div class="day-page-topbar no-print">
         <a class="day-page-back" href="">← Accueil</a>
         <div class="day-topbar-right">
+            <div class="day-nav-arrows">
+                @if (PrevDay is not null)
+                {
+                    <a class="day-nav-arrow" href="jour/@PrevDay.Date.ToString("yyyy-MM-dd")" title="@PrevDay.Label">‹</a>
+                }
+                else
+                {
+                    <span class="day-nav-arrow day-nav-arrow-disabled">‹</span>
+                }
+                @if (NextDay is not null)
+                {
+                    <a class="day-nav-arrow" href="jour/@NextDay.Date.ToString("yyyy-MM-dd")" title="@NextDay.Label">›</a>
+                }
+                else
+                {
+                    <span class="day-nav-arrow day-nav-arrow-disabled">›</span>
+                }
+            </div>
             <div class="view-switch">
                 <button class="view-switch-btn @(!_calView ? "vs-active" : "")"
                         @onclick='() => _calView = false' title="Vue liste">📋</button>
@@ -211,6 +229,12 @@ else
 
     private bool IsWeddingDay => _day is not null && Store.IsWeddingDay(_day);
     private bool IsToday => _day?.Date == DateOnly.FromDateTime(DateTime.Now);
+
+    private WeddingDay? PrevDay => _day is null ? null
+        : Store.OrderedDays.TakeWhile(d => d.Date < _day.Date).LastOrDefault();
+
+    private WeddingDay? NextDay => _day is null ? null
+        : Store.OrderedDays.SkipWhile(d => d.Date <= _day.Date).FirstOrDefault();
 
     private IEnumerable<TaskItem> UntimedTasks =>
         _day?.Activities.Where(t => t.Time is null) ?? [];

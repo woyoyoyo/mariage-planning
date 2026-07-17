@@ -2060,6 +2060,35 @@ button.tile:disabled { opacity: 0.45; }
     gap: 4px;
 }
 
+.day-nav-arrows {
+    display: flex;
+    gap: 0;
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-nav-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--color-primary);
+    text-decoration: none;
+    line-height: 1;
+    transition: background .15s;
+}
+
+.day-nav-arrow:not(.day-nav-arrow-disabled):active { background: var(--color-border); }
+
+.day-nav-arrow-disabled {
+    color: var(--color-border);
+    cursor: default;
+}
+
 /* ── Toggle Liste / Calendrier ─────────────────────────────────────────── */
 
 .view-switch {
@@ -2710,7 +2739,8 @@ button.tile:disabled { opacity: 0.45; }
 .chat-wrap {
     display: flex;
     flex-direction: column;
-    height: calc(100dvh - var(--nav-height) - env(safe-area-inset-top, 0px));
+    /* 12px = padding-top de .app-content ; env(...bottom) = safe area en bas sous la nav */
+    height: calc(100dvh - var(--nav-height) - env(safe-area-inset-bottom, 0px) - 12px);
     padding: 0;
 }
 
