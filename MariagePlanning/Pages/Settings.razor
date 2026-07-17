@@ -381,9 +381,15 @@
             <label class="show-token">
                 <input type="checkbox" @bind="_showGeminiKey" /> Afficher la clé
             </label>
-            <button class="action-btn btn-refresh" @onclick="SaveGeminiKeyAsync" disabled="@_geminiKeySaving">
-                @(_geminiKeySaving ? "⏳…" : Gemini.IsConfigured ? "💾 Mettre à jour la clé" : "💾 Enregistrer la clé")
-            </button>
+            <div class="add-form-actions">
+                <button class="action-btn btn-refresh" @onclick="SaveGeminiKeyAsync" disabled="@_geminiKeySaving">
+                    @(_geminiKeySaving ? "⏳…" : "💾 Enregistrer")
+                </button>
+                <button class="action-btn btn-clear" @onclick="TestGeminiKeyAsync"
+                        disabled="@(_geminiKeySaving || _geminiKeyTesting || !Gemini.IsConfigured)">
+                    @(_geminiKeyTesting ? "⏳ Test…" : "🧪 Tester")
+                </button>
+            </div>
             @if (_geminiKeyFeedback is not null)
             {
                 <div class="sync-status @(_geminiKeyOk ? "sync-ok" : "sync-warn")">@_geminiKeyFeedback</div>
@@ -446,6 +452,7 @@
     private string? _geminiKey;
     private bool    _showGeminiKey;
     private bool    _geminiKeySaving;
+    private bool    _geminiKeyTesting;
     private string? _geminiKeyFeedback;
     private bool    _geminiKeyOk;
 
@@ -460,14 +467,35 @@
 
     private async Task SaveGeminiKeyAsync()
     {
-        _geminiKeySaving = true;
+        _geminiKeySaving  = true;
         _geminiKeyFeedback = null;
         await Config.SetGeminiApiKeyAsync(_geminiKey);
         _geminiKeySaving = false;
-        _geminiKeyOk = Gemini.IsConfigured;
+        _geminiKeyOk     = Gemini.IsConfigured;
         _geminiKeyFeedback = Gemini.IsConfigured
-            ? "✅ Clé Gemini enregistrée — l'assistant est prêt."
+            ? "✅ Clé enregistrée — clique 🧪 Tester pour vérifier."
             : "🗑️ Clé supprimée.";
+    }
+
+    private async Task TestGeminiKeyAsync()
+    {
+        _geminiKeyTesting  = true;
+        _geminiKeyFeedback = null;
+        try
+        {
+            var result = await Gemini.ChatAsync(
+                "Tu es un assistant. Réponds uniquement avec le mot : OK",
+                [],
+                "Test de connexion.");
+            _geminiKeyOk       = true;
+            _geminiKeyFeedback = $"✅ Connexion Gemini OK — la clé est valide.";
+        }
+        catch (Exception ex)
+        {
+            _geminiKeyOk       = false;
+            _geminiKeyFeedback = $"⚠️ Erreur : {ex.Message}";
+        }
+        finally { _geminiKeyTesting = false; }
     }
 
     private async Task SaveAsync()
