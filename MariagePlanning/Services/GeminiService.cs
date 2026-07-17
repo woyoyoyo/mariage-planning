@@ -22,7 +22,7 @@ public class AssistantAction
 public class GeminiService(SettingsService settings)
 {
     private static readonly HttpClient _http = new();
-    public const string DefaultModel = "gemini-3.5-flash";
+    public const string DefaultModel = "gemini-2.0-flash";
     private string ApiUrl => $"https://generativelanguage.googleapis.com/v1beta/models/{settings.GeminiModel}:generateContent";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(settings.GeminiApiKey);
@@ -48,8 +48,13 @@ public class GeminiService(SettingsService settings)
 
         if (!resp.IsSuccessStatusCode)
         {
+            if ((int)resp.StatusCode == 503)
+                throw new Exception("Le modèle Gemini est momentanément surchargé. Réessaie dans quelques secondes, ou change de modèle dans Paramètres.");
+
             var err = await resp.Content.ReadAsStringAsync();
-            throw new Exception($"Erreur Gemini {(int)resp.StatusCode} — {err[..Math.Min(300, err.Length)]}");
+            string? message = null;
+            try { message = System.Text.Json.JsonDocument.Parse(err).RootElement.GetProperty("error").GetProperty("message").GetString(); } catch { }
+            throw new Exception($"Erreur Gemini {(int)resp.StatusCode} — {message ?? err[..Math.Min(200, err.Length)]}");
         }
 
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
