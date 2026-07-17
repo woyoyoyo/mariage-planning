@@ -12,5 +12,6 @@ builder.Services.AddScoped<GistService>();
 builder.Services.AddScoped<LocalStorageService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<WeddingStore>();
+builder.Services.AddScoped<GeminiService>();
 
 await builder.Build().RunAsync();

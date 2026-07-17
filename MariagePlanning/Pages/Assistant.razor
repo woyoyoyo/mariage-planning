@@ -1,0 +1,291 @@
+@page "/assistant"
+@implements IDisposable
+@inject GeminiService Gemini
+@inject WeddingStore Store
+@inject SettingsService Config
+@inject NavigationManager Nav
+
+<PageTitle>Mariage Planning — Assistant IA</PageTitle>
+
+@if (!Gemini.IsConfigured)
+{
+    <div class="chat-unconfigured">
+        <div class="chat-unconfigured-icon">🤖</div>
+        <p>L'assistant IA n'est pas encore configuré.</p>
+        <p>Ajoute ta clé Gemini dans les <a href="parametres">Paramètres</a>.</p>
+    </div>
+}
+else if (Store.Data is null)
+{
+    <div class="loading-message">Chargement du planning…</div>
+}
+else
+{
+    <div class="chat-wrap">
+        <div class="chat-messages" @ref="_msgContainer">
+
+            @if (_messages.Count == 0)
+            {
+                <div class="chat-intro">
+                    <div class="chat-intro-icon">💬</div>
+                    <p>Bonjour ! Je peux t'aider à ajouter des tâches au planning ou à répondre à tes questions.</p>
+                    <p class="chat-intro-hint">Essaie : <em>« Ajoute la livraison des fleurs le 4 juin à 10h pour Sophie »</em></p>
+                </div>
+            }
+
+            @foreach (var msg in _messages)
+            {
+                <div class="chat-row @(msg.IsUser ? "chat-row-user" : "chat-row-ai")">
+                    @if (!msg.IsUser)
+                    {
+                        <div class="chat-avatar">🤖</div>
+                    }
+                    <div class="chat-bubble @(msg.IsUser ? "chat-bubble-user" : msg.IsAction ? "chat-bubble-action" : "chat-bubble-ai")">
+                        @msg.Text
+                    </div>
+                </div>
+            }
+
+            @if (_thinking)
+            {
+                <div class="chat-row chat-row-ai">
+                    <div class="chat-avatar">🤖</div>
+                    <div class="chat-bubble chat-bubble-ai chat-thinking">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            }
+
+            @if (_error is not null)
+            {
+                <div class="chat-error">⚠️ @_error</div>
+            }
+        </div>
+
+        <div class="chat-input-row">
+            <button class="chat-btn-voice @(_recording ? "chat-btn-recording" : "")"
+                    @onclick="ToggleVoiceAsync"
+                    disabled="@_thinking"
+                    title="@(_recording ? "Arrêter l'enregistrement" : "Parler")">
+                @(_recording ? "⏹" : "🎤")
+            </button>
+            <input class="chat-input"
+                   @bind="_draft"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyAsync"
+                   placeholder="@(_recording ? "À l'écoute…" : "Écris ou utilise le micro…")"
+                   disabled="@(_thinking || _recording)"
+                   @ref="_inputRef" />
+            <button class="chat-btn-send"
+                    @onclick="SendAsync"
+                    disabled="@(string.IsNullOrWhiteSpace(_draft) || _thinking || _recording)">
+                ➤
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<ChatMessage> _messages = [];
+    private string  _draft    = "";
+    private bool    _thinking;
+    private bool    _recording;
+    private string? _error;
+    private DotNetObjectReference<Assistant>? _dotnetRef;
+    private ElementReference _msgContainer;
+    private ElementReference _inputRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnStoreChanged;
+        await Config.EnsureLoadedAsync();
+        await Store.EnsureLoadedAsync();
+        _dotnetRef = DotNetObjectReference.Create(this);
+    }
+
+    public void Dispose()
+    {
+        Store.Changed -= OnStoreChanged;
+        _dotnetRef?.Dispose();
+    }
+
+    private void OnStoreChanged() => InvokeAsync(StateHasChanged);
+
+    // ── Envoi d'un message ────────────────────────────────────────────────────
+
+    private async Task SendAsync()
+    {
+        var text = _draft.Trim();
+        if (string.IsNullOrEmpty(text) || _thinking) return;
+        _draft = "";
+        _error = null;
+        await SubmitAsync(text);
+    }
+
+    private async Task HandleKeyAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_draft))
+            await SendAsync();
+    }
+
+    private async Task SubmitAsync(string userText)
+    {
+        _messages.Add(new ChatMessage(userText, IsUser: true));
+        _thinking = true;
+        StateHasChanged();
+        await ScrollToBottomAsync();
+
+        try
+        {
+            var systemPrompt = GeminiService.BuildSystemPrompt(
+                Store.Data!,
+                DateOnly.FromDateTime(DateTime.Now).ToString("yyyy-MM-dd"));
+
+            // Historique : seulement les messages user/ai (pas les actions système)
+            var history = _messages.SkipLast(1)
+                .Where(m => !m.IsAction)
+                .ToList();
+
+            var raw = await Gemini.ChatAsync(systemPrompt, history, userText);
+            var (displayText, action) = GeminiService.ParseResponse(raw);
+
+            // Affiche le texte conversationnel si présent
+            if (!string.IsNullOrWhiteSpace(displayText))
+                _messages.Add(new ChatMessage(displayText, IsUser: false));
+
+            // Exécute l'action si présente
+            if (action is not null && action.Action == "add_task")
+                await ExecuteAddTaskAsync(action);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _thinking = false;
+            StateHasChanged();
+            await ScrollToBottomAsync();
+        }
+    }
+
+    private async Task ExecuteAddTaskAsync(AssistantAction action)
+    {
+        if (!Store.CanEdit)
+        {
+            _messages.Add(new ChatMessage("⚠️ Mode lecture seule — je ne peux pas créer de tâche.", IsUser: false, IsAction: true));
+            return;
+        }
+
+        if (!DateOnly.TryParse(action.Date, out var date))
+        {
+            _messages.Add(new ChatMessage("⚠️ Date invalide dans la réponse, réessaie.", IsUser: false, IsAction: true));
+            return;
+        }
+
+        // Résoudre les IDs de personnes (Gemini peut renvoyer un nom au lieu d'un ID)
+        var assignedIds = (action.AssignedTo ?? [])
+            .Select(x => GeminiService.ResolvePersonId(x, Store.Data!.People) ?? x)
+            .Where(id => Store.Data!.People.Any(p => p.Id == id))
+            .Distinct()
+            .ToList();
+
+        var title = action.Title?.Trim() ?? "Tâche sans titre";
+        var time  = string.IsNullOrWhiteSpace(action.Time) || action.Time == "null" ? null : action.Time;
+        var loc   = string.IsNullOrWhiteSpace(action.Location) || action.Location == "null" ? null : action.Location;
+        var notes = string.IsNullOrWhiteSpace(action.Notes) || action.Notes == "null" ? null : action.Notes;
+
+        var (ok, error) = await Store.SaveAsync(data =>
+        {
+            var day = data.Days.FirstOrDefault(d => d.Date == date);
+            if (day is null) return false;
+            day.Activities.Add(new MariagePlanning.Models.TaskItem
+            {
+                Title      = title,
+                Time       = time,
+                Location   = loc,
+                Notes      = notes,
+                AssignedTo = assignedIds
+            });
+            return true;
+        });
+
+        if (ok)
+        {
+            var who = assignedIds.Count == 0
+                ? "tout le monde"
+                : string.Join(", ", assignedIds.Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+            var timeStr = time is not null ? $" à {time}" : "";
+            _messages.Add(new ChatMessage($"✅ Tâche ajoutée : « {title} »{timeStr} le {date:d MMMM} pour {who}.", IsUser: false, IsAction: true));
+        }
+        else
+        {
+            _messages.Add(new ChatMessage($"⚠️ Impossible d'enregistrer : {error ?? "jour introuvable dans le planning."}", IsUser: false, IsAction: true));
+        }
+    }
+
+    // ── Reconnaissance vocale ─────────────────────────────────────────────────
+
+    private async Task ToggleVoiceAsync()
+    {
+        if (_recording)
+        {
+            _recording = false;
+            // JS stopSpeech sera appelé par onend automatiquement
+            return;
+        }
+
+        _recording = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var started = await JSHelper.InvokeAsync<bool>("mariage.startSpeech", _dotnetRef!);
+            if (!started)
+            {
+                _error = "La reconnaissance vocale n'est pas supportée sur ce navigateur.";
+                _recording = false;
+            }
+        }
+        catch
+        {
+            _recording = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnSpeechResult(string transcript)
+    {
+        _recording = false;
+        _draft     = "";
+        StateHasChanged();
+        await SubmitAsync(transcript);
+    }
+
+    [JSInvokable]
+    public void OnSpeechEnd()
+    {
+        _recording = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnSpeechError(string errorCode)
+    {
+        _recording = false;
+        _error = errorCode == "not-allowed"
+            ? "Microphone non autorisé — vérifie les permissions du navigateur."
+            : $"Erreur micro : {errorCode}";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try { await JSHelper.InvokeVoidAsync("mariage.scrollToBottom", _msgContainer); }
+        catch { }
+    }
+
+    // Raccourci pour éviter d'injecter IJSRuntime (il est injecté via le champ)
+    [Inject] private IJSRuntime JSHelper { get; set; } = default!;
+}

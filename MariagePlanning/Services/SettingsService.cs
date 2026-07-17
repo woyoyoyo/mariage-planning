@@ -7,16 +7,18 @@ namespace MariagePlanning.Services;
 /// </summary>
 public class SettingsService(LocalStorageService storage)
 {
-    private const string GistIdKey = "mp.gistId";
-    private const string TokenKey = "mp.token";
+    private const string GistIdKey       = "mp.gistId";
+    private const string TokenKey         = "mp.token";
     private const string CurrentPersonKey = "mp.currentPerson";
-    private const string LockedTokenKey = "mp.lockedToken";
+    private const string LockedTokenKey   = "mp.lockedToken";
+    private const string GeminiKeyKey     = "mp.geminiKey";
 
     private bool _loaded;
 
-    public string? GistId { get; private set; }
-    public string? Token { get; private set; }
+    public string? GistId        { get; private set; }
+    public string? Token         { get; private set; }
     public string? CurrentPerson { get; private set; }
+    public string? GeminiApiKey  { get; private set; }
 
     /// <summary>Token chiffré reçu via un lien de partage — déverrouillable plus tard avec le mot de passe.</summary>
     public string? LockedToken { get; private set; }
@@ -29,10 +31,11 @@ public class SettingsService(LocalStorageService storage)
     {
         if (_loaded)
             return;
-        GistId = await storage.GetAsync(GistIdKey);
-        Token = await storage.GetAsync(TokenKey);
-        CurrentPerson = await storage.GetAsync(CurrentPersonKey);
-        LockedToken = await storage.GetAsync(LockedTokenKey);
+        GistId       = await storage.GetAsync(GistIdKey);
+        Token        = await storage.GetAsync(TokenKey);
+        CurrentPerson= await storage.GetAsync(CurrentPersonKey);
+        LockedToken  = await storage.GetAsync(LockedTokenKey);
+        GeminiApiKey = await storage.GetAsync(GeminiKeyKey);
         _loaded = true;
     }
 
@@ -62,6 +65,13 @@ public class SettingsService(LocalStorageService storage)
             await storage.RemoveAsync(LockedTokenKey);
         else
             await storage.SetAsync(LockedTokenKey, LockedToken);
+    }
+
+    public async Task SetGeminiApiKeyAsync(string? key)
+    {
+        GeminiApiKey = string.IsNullOrWhiteSpace(key) ? null : key.Trim();
+        if (GeminiApiKey is null) await storage.RemoveAsync(GeminiKeyKey);
+        else await storage.SetAsync(GeminiKeyKey, GeminiApiKey);
     }
 
     public async Task SetCurrentPersonAsync(string? personId)

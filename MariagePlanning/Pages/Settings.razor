@@ -1,6 +1,7 @@
 @page "/parametres"
 @inject SettingsService Config
 @inject WeddingStore Store
+@inject GeminiService Gemini
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -363,6 +364,33 @@
         </div>
     }
 
+    <details class="config-section" open="@(!Gemini.IsConfigured)">
+        <summary class="config-section-summary">🤖 Assistant IA (Gemini)</summary>
+        <div class="config-section-body">
+            <p class="form-hint">
+                Clé API Google Gemini (gratuite sur <b>aistudio.google.com</b>).
+                Stockée uniquement sur ce téléphone.
+            </p>
+            <label class="form-field">
+                <span class="form-label">Clé Gemini</span>
+                <input class="form-input" type="@(_showGeminiKey ? "text" : "password")"
+                       @bind="_geminiKey"
+                       placeholder="AIza..."
+                       autocapitalize="off" autocorrect="off" spellcheck="false" />
+            </label>
+            <label class="show-token">
+                <input type="checkbox" @bind="_showGeminiKey" /> Afficher la clé
+            </label>
+            <button class="action-btn btn-refresh" @onclick="SaveGeminiKeyAsync" disabled="@_geminiKeySaving">
+                @(_geminiKeySaving ? "⏳…" : Gemini.IsConfigured ? "💾 Mettre à jour la clé" : "💾 Enregistrer la clé")
+            </button>
+            @if (_geminiKeyFeedback is not null)
+            {
+                <div class="sync-status @(_geminiKeyOk ? "sync-ok" : "sync-warn")">@_geminiKeyFeedback</div>
+            }
+        </div>
+    </details>
+
     <details class="config-section" open="@(!Config.IsConfigured)">
         <summary class="config-section-summary">🔧 Configuration de l'accès</summary>
         <div class="config-section-body">
@@ -409,17 +437,37 @@
 @code {
     private string? _gistId;
     private string? _token;
-    private bool _showToken;
-    private bool _busy;
+    private bool    _showToken;
+    private bool    _busy;
     private string? _feedback;
-    private string _feedbackClass = "";
+    private string  _feedbackClass = "";
+
+    // Gemini
+    private string? _geminiKey;
+    private bool    _showGeminiKey;
+    private bool    _geminiKeySaving;
+    private string? _geminiKeyFeedback;
+    private bool    _geminiKeyOk;
 
     protected override async Task OnInitializedAsync()
     {
         await Config.EnsureLoadedAsync();
         await Store.EnsureLoadedAsync();
-        _gistId = Config.GistId;
-        _token = Config.Token;
+        _gistId    = Config.GistId;
+        _token     = Config.Token;
+        _geminiKey = Config.GeminiApiKey;
+    }
+
+    private async Task SaveGeminiKeyAsync()
+    {
+        _geminiKeySaving = true;
+        _geminiKeyFeedback = null;
+        await Config.SetGeminiApiKeyAsync(_geminiKey);
+        _geminiKeySaving = false;
+        _geminiKeyOk = Gemini.IsConfigured;
+        _geminiKeyFeedback = Gemini.IsConfigured
+            ? "✅ Clé Gemini enregistrée — l'assistant est prêt."
+            : "🗑️ Clé supprimée.";
     }
 
     private async Task SaveAsync()

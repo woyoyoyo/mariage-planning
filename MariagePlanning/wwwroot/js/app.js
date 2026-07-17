@@ -90,5 +90,31 @@ window.mariage = {
         s = s.replaceAll('-', '+').replaceAll('_', '/');
         while (s.length % 4) s += '=';
         return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    },
+
+    // ── Reconnaissance vocale (Web Speech API) ────────────────────────────────
+    startSpeech: (dotnetRef) => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return false;
+        const r = new SR();
+        r.lang = 'fr-FR';
+        r.interimResults = false;
+        r.maxAlternatives = 1;
+        r.continuous = false;
+        r.onresult = e => {
+            const t = e.results[0][0].transcript;
+            dotnetRef.invokeMethodAsync('OnSpeechResult', t);
+        };
+        r.onerror = e => dotnetRef.invokeMethodAsync('OnSpeechError', e.error);
+        r.onend   = () => dotnetRef.invokeMethodAsync('OnSpeechEnd');
+        r.start();
+        window._mariage_sr = r;
+        return true;
+    },
+
+    stopSpeech: () => { window._mariage_sr?.stop(); },
+
+    scrollToBottom: (el) => {
+        if (el) el.scrollTop = el.scrollHeight;
     }
 };
