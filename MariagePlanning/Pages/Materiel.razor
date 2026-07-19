@@ -1,6 +1,7 @@
 @page "/materiel"
 @implements IDisposable
 @inject WeddingStore Store
+@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — Matériel</PageTitle>
 
@@ -29,7 +30,7 @@ else
             <span class="tab-count">@Store.Data.Supplies.Count(s => s.Status == "have")</span>
         </button>
         <button class="tab @(_tab == Tab.All ? "tab-active" : "")" @onclick='() => _tab = Tab.All'>
-            📋 Tout
+            📍 Par lieu
             <span class="tab-count">@Store.Data.Supplies.Count</span>
         </button>
     </div>
@@ -190,6 +191,7 @@ else
     private void StartEdit(SupplyItem s)
     {
         _editingId = s.Id; _addingNew = false; _error = null;
+        _ = InvokeAsync(async () => { await Task.Yield(); await JS.InvokeVoidAsync("mariage.scrollToId", $"edit-form-{s.Id}"); });
         _fName = s.Name; _fCategory = s.Category; _fStatus = s.Status;
         _fQty = s.Quantity; _fLocation = s.Location;
         _fVenueId = s.VenueId ?? (s.Location is not null ? "__custom" : "");
@@ -299,7 +301,7 @@ else
         var sid = item.Id;
         if (_editingId == sid)
         {
-            <div class="add-form edit-form supply-form">
+            <div id="edit-form-@sid" class="add-form edit-form supply-form">
                 @SupplyFields()
                 @if (_error is not null)
                 {

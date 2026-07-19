@@ -1,6 +1,7 @@
 @page "/todos"
 @implements IDisposable
 @inject WeddingStore Store
+@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — À faire</PageTitle>
 
@@ -15,85 +16,6 @@
 }
 else
 {
-    @* ── Formulaire d'ajout ──────────────────────────────────────────────── *@
-    @if (Store.CanEdit)
-    {
-        @if (_adding || _editingId is not null)
-        {
-            <div class="add-form todo-form">
-                <label class="form-field">
-                    <span class="form-label">Titre *</span>
-                    <input class="form-input" type="text" @bind="_fTitle"
-                           placeholder="ex : Confirmer la salle de réception"
-                           autocapitalize="sentences" />
-                </label>
-                <label class="form-field">
-                    <span class="form-label">📅 Date butoir</span>
-                    <input class="form-input" type="date" @bind="_fDueDate" />
-                </label>
-                <label class="form-field">
-                    <span class="form-label">💡 Notes</span>
-                    <textarea class="form-input form-textarea" @bind="_fNotes" rows="2"
-                              placeholder="Détails, numéro de devis…"></textarea>
-                </label>
-
-                @if (Store.Data.People.Any())
-                {
-                    <div class="form-field">
-                        <span class="form-label">👤 Responsable(s)</span>
-                        <div class="person-checks">
-                            @foreach (var person in Store.Data.People)
-                            {
-                                <label class="person-check @(_fPersonIds.Contains(person.Id) ? "is-checked" : "")"
-                                       style="--person-color:@person.Color">
-                                    <input type="checkbox" checked="@_fPersonIds.Contains(person.Id)"
-                                           @onchange="e => Toggle(_fPersonIds, person.Id, e)" />
-                                    @person.Name
-                                </label>
-                            }
-                        </div>
-                    </div>
-                }
-
-                @if (Store.Data.Contacts.Any())
-                {
-                    <div class="form-field">
-                        <span class="form-label">📇 Contact(s) lié(s)</span>
-                        <div class="person-checks">
-                            @foreach (var contact in Store.Data.Contacts)
-                            {
-                                <label class="person-check @(_fContactIds.Contains(contact.Id) ? "is-checked" : "")"
-                                       style="--person-color:#64748b">
-                                    <input type="checkbox" checked="@_fContactIds.Contains(contact.Id)"
-                                           @onchange="e => Toggle(_fContactIds, contact.Id, e)" />
-                                    @contact.Name
-                                </label>
-                            }
-                        </div>
-                    </div>
-                }
-
-                @if (_formError is not null)
-                {
-                    <div class="sync-status sync-warn">⚠️ @_formError</div>
-                }
-                <div class="add-form-actions">
-                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
-                    <button class="action-btn btn-refresh" @onclick="SaveAsync"
-                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fTitle))">
-                        @(_busy ? "⏳…" : (_editingId is null ? "➕ Ajouter" : "💾 Enregistrer"))
-                    </button>
-                </div>
-            </div>
-        }
-        else
-        {
-            <button class="action-btn btn-add" style="margin-bottom:4px" @onclick="StartAdd">
-                ➕ Ajouter un todo
-            </button>
-        }
-    }
-
     @* ── Liste groupée ───────────────────────────────────────────────────── *@
     @if (!Store.Data.Todos.Any())
     {
@@ -115,6 +37,34 @@ else
                 @TodoRow(todo, Today)
             }
         </details>
+    }
+
+    @* ── Formulaire d'ajout (bas de page) ───────────────────────────────── *@
+    @if (Store.CanEdit)
+    {
+        @if (_adding)
+        {
+            <div class="add-form todo-form">
+                @TodoFormFields()
+                @if (_formError is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_formError</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fTitle))">
+                        @(_busy ? "⏳…" : "➕ Ajouter")
+                    </button>
+                </div>
+            </div>
+        }
+        else if (_editingId is null)
+        {
+            <button class="action-btn btn-add" style="margin-bottom:4px" @onclick="StartAdd">
+                ➕ Ajouter un todo
+            </button>
+        }
     }
 }
 
@@ -158,6 +108,7 @@ else
         _fPersonIds  = [.. t.PersonIds];
         _fContactIds = [.. t.ContactIds];
         _formError = null;
+        _ = InvokeAsync(async () => { await Task.Yield(); await JS.InvokeVoidAsync("mariage.scrollToId", $"edit-form-{t.Id}"); });
     }
 
     private void CancelForm() { _adding = false; _editingId = null; _formError = null; }
@@ -239,6 +190,61 @@ else
 
     // ── Rendu ────────────────────────────────────────────────────────────────
 
+    private RenderFragment TodoFormFields() => __builder =>
+    {
+        <label class="form-field">
+            <span class="form-label">Titre *</span>
+            <input class="form-input" type="text" @bind="_fTitle"
+                   placeholder="ex : Confirmer la salle de réception"
+                   autocapitalize="sentences" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">📅 Date butoir</span>
+            <input class="form-input" type="date" @bind="_fDueDate" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">💡 Notes</span>
+            <textarea class="form-input form-textarea" @bind="_fNotes" rows="2"
+                      placeholder="Détails, numéro de devis…"></textarea>
+        </label>
+
+        @if (Store.Data!.People.Any())
+        {
+            <div class="form-field">
+                <span class="form-label">👤 Responsable(s)</span>
+                <div class="person-checks">
+                    @foreach (var person in Store.Data.People)
+                    {
+                        <label class="person-check @(_fPersonIds.Contains(person.Id) ? "is-checked" : "")"
+                               style="--person-color:@person.Color">
+                            <input type="checkbox" checked="@_fPersonIds.Contains(person.Id)"
+                                   @onchange="e => Toggle(_fPersonIds, person.Id, e)" />
+                            @person.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Store.Data!.Contacts.Any())
+        {
+            <div class="form-field">
+                <span class="form-label">📇 Contact(s) lié(s)</span>
+                <div class="person-checks">
+                    @foreach (var contact in Store.Data.Contacts)
+                    {
+                        <label class="person-check @(_fContactIds.Contains(contact.Id) ? "is-checked" : "")"
+                               style="--person-color:#64748b">
+                            <input type="checkbox" checked="@_fContactIds.Contains(contact.Id)"
+                                   @onchange="e => Toggle(_fContactIds, contact.Id, e)" />
+                            @contact.Name
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+    };
+
     private RenderFragment TodoGroup(string label, List<TodoItem> items, string css) => __builder =>
     {
         if (!items.Any()) return;
@@ -255,6 +261,26 @@ else
     private RenderFragment TodoRow(TodoItem todo, DateOnly today) => __builder =>
     {
         var tid = todo.Id;
+
+        if (_editingId == tid)
+        {
+            <div id="edit-form-@tid" class="add-form todo-form">
+                @TodoFormFields()
+                @if (_formError is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_formError</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fTitle))">
+                        @(_busy ? "⏳…" : "💾 Enregistrer")
+                    </button>
+                </div>
+            </div>
+            return;
+        }
+
         <div class="todo-item @(todo.IsDone ? "todo-item-done" : "")">
             <button class="todo-check" @onclick="() => ToggleDoneAsync(tid)"
                     disabled="@(!Store.CanEdit)">

@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject WeddingStore Store
 @inject SettingsService Config
+@inject IJSRuntime JS
 
 <PageTitle>Mariage Planning — Contacts</PageTitle>
 
@@ -48,7 +49,7 @@ else
             var cid = contact.Id;
             @if (_editingId == cid)
             {
-                <div class="add-form edit-form contact-form">
+                <div id="edit-form-@cid" class="add-form edit-form contact-form">
                     @ContactFields()
                     @if (_error is not null)
                     {
@@ -208,7 +209,7 @@ else
             var vid = venue.Id;
             @if (_vEditingId == vid)
             {
-                <div class="add-form edit-form contact-form">
+                <div id="edit-form-@vid" class="add-form edit-form contact-form">
                     @VenueFields()
                     @if (_vError is not null)
                     {
@@ -355,6 +356,7 @@ else
         _fName = c.Name; _fPerson = c.ContactPerson; _fPhone = c.Phone;
         _fAddress = c.Address; _fNotes = c.Notes;
         _fLinks = [.. c.Links]; _newLinkInput = null; _error = null;
+        _ = InvokeAsync(async () => { await Task.Yield(); await JS.InvokeVoidAsync("mariage.scrollToId", $"edit-form-{c.Id}"); });
     }
 
     private void CancelForm()
@@ -473,6 +475,7 @@ else
         _vAddingNew = false;
         _vfName = v.Name; _vfAddress = v.Address; _vfNotes = v.Notes;
         _vfContactIds = [.. v.ContactIds]; _vfPersonIds = [.. v.PersonIds]; _vError = null;
+        _ = InvokeAsync(async () => { await Task.Yield(); await JS.InvokeVoidAsync("mariage.scrollToId", $"edit-form-{v.Id}"); });
     }
 
     private void CancelVenueForm()

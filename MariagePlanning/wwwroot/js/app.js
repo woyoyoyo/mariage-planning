@@ -119,5 +119,10 @@ window.mariage = {
 
     scrollToBottom: (el) => {
         if (el) el.scrollTop = el.scrollHeight;
+    },
+
+    scrollToId: (id) => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 };
