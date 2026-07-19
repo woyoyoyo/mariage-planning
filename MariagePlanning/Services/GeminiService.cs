@@ -19,6 +19,12 @@ public class AssistantAction
     [JsonPropertyName("notes")]     public string?      Notes      { get; set; }
     [JsonPropertyName("assignedTo")]public List<string> AssignedTo { get; set; } = [];
     [JsonPropertyName("personIds")] public List<string> PersonIds  { get; set; } = [];
+    // add_supply
+    [JsonPropertyName("category")]  public string?      Category   { get; set; }
+    [JsonPropertyName("status")]    public string?      Status     { get; set; }
+    [JsonPropertyName("quantity")]  public int          Quantity   { get; set; } = 1;
+    [JsonPropertyName("price")]     public string?      Price      { get; set; }
+    [JsonPropertyName("link")]      public string?      Link       { get; set; }
 }
 
 public class GeminiService(SettingsService settings)
@@ -157,7 +163,7 @@ public class GeminiService(SettingsService settings)
         sb.AppendLine();
 
         sb.AppendLine("INSTRUCTIONS :");
-        sb.AppendLine("Il existe DEUX types de création :");
+        sb.AppendLine("Il existe TROIS types de création :");
         sb.AppendLine();
         sb.AppendLine("1) TÂCHE de planning (sur un jour précis du planning) → action add_task :");
         sb.AppendLine("  ```json");
@@ -174,8 +180,18 @@ public class GeminiService(SettingsService settings)
         sb.AppendLine("  - personIds contient les IDs de PERSONNES uniquement (pas d'équipes).");
         sb.AppendLine("  - dueDate est la date limite (peut être null si pas de deadline).");
         sb.AppendLine();
+        sb.AppendLine("3) MATÉRIEL (article à acheter, commandé ou déjà en stock) → action add_supply :");
+        sb.AppendLine("  ```json");
+        sb.AppendLine("  {\"action\":\"add_supply\",\"title\":\"...\",\"category\":\"ex: Décoration\",\"status\":\"tobuy\",\"quantity\":1,\"price\":null,\"location\":null,\"notes\":null,\"link\":null}");
+        sb.AppendLine("  ```");
+        sb.AppendLine("  - status : \"tobuy\" (à acheter), \"ordered\" (commandé), \"have\" (en stock).");
+        sb.AppendLine("  - price : prix unitaire en euros sous forme de nombre (ex: 12.50), ou null.");
+        sb.AppendLine("  - quantity : nombre entier, défaut 1.");
+        sb.AppendLine("  - link : URL d'achat ou null.");
+        sb.AppendLine();
         sb.AppendLine("RÈGLES COMMUNES :");
-        sb.AppendLine("- Si la demande porte sur quelque chose à FAIRE/PRÉPARER/ACHETER sans être sur un jour précis du planning → utilise add_todo.");
+        sb.AppendLine("- Si la demande porte sur un ARTICLE À ACHETER / du matériel / une fourniture → utilise add_supply.");
+        sb.AppendLine("- Si la demande porte sur quelque chose à FAIRE/PRÉPARER (pas un objet) sans jour précis → utilise add_todo.");
         sb.AppendLine("- Si la demande porte sur un événement/tâche sur un jour précis du planning → utilise add_task.");
         sb.AppendLine("- Si le titre manque : POSE UNE QUESTION avant d'émettre le JSON.");
         sb.AppendLine("- Réponds d'abord en texte naturel, PUIS ajoute le bloc JSON.");

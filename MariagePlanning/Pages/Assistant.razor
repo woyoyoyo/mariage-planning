@@ -53,9 +53,30 @@ else
                 <div class="chat-row chat-row-ai">
                     <div class="chat-avatar">🤖</div>
                     <div class="chat-confirm-card">
-                        <div class="chat-confirm-title">@(isTodo ? "✅ Confirmer le todo ?" : "📋 Confirmer l'ajout ?")</div>
-                        <div class="chat-confirm-field"><b>@(isTodo ? "Todo" : "Tâche")</b> : @_pendingAction.Title</div>
-                        @if (isTodo)
+                        @{ var isSupply = _pendingAction.Action == "add_supply"; }
+                        <div class="chat-confirm-title">@(isTodo ? "✅ Confirmer le todo ?" : isSupply ? "📦 Confirmer l'article ?" : "📋 Confirmer l'ajout ?")</div>
+                        <div class="chat-confirm-field"><b>@(isTodo ? "Todo" : isSupply ? "Article" : "Tâche")</b> : @_pendingAction.Title</div>
+                        @if (isSupply)
+                        {
+                            @if (!string.IsNullOrWhiteSpace(_pendingAction.Category))
+                            {
+                                <div class="chat-confirm-field"><b>Catégorie</b> : @_pendingAction.Category</div>
+                            }
+                            <div class="chat-confirm-field"><b>Statut</b> : @(_pendingAction.Status switch { "ordered" => "📦 Commandé", "have" => "✅ En stock", _ => "🛒 À acheter" })</div>
+                            @if (_pendingAction.Quantity > 1)
+                            {
+                                <div class="chat-confirm-field"><b>Quantité</b> : @_pendingAction.Quantity</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_pendingAction.Price) && _pendingAction.Price != "null")
+                            {
+                                <div class="chat-confirm-field"><b>Prix</b> : @_pendingAction.Price €</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_pendingAction.Location) && _pendingAction.Location != "null")
+                            {
+                                <div class="chat-confirm-field"><b>Lieu</b> : @_pendingAction.Location</div>
+                            }
+                        }
+                        else if (isTodo)
                         {
                             @if (_pendingDayLabel is not null)
                             {
@@ -208,7 +229,7 @@ else
                 _messages.Add(new ChatMessage(displayText, IsUser: false));
 
             // Mettre l'action en attente de confirmation
-            if (action is not null && (action.Action == "add_task" || action.Action == "add_todo"))
+            if (action is not null && action.Action is "add_task" or "add_todo" or "add_supply")
                 PrepareConfirmation(action);
         }
         catch (Exception ex)
@@ -227,7 +248,12 @@ else
     {
         _pendingAction = action;
 
-        if (action.Action == "add_todo")
+        if (action.Action == "add_supply")
+        {
+            _pendingDayLabel = null;
+            _pendingWho = null;
+        }
+        else if (action.Action == "add_todo")
         {
             // Date limite du todo
             _pendingDayLabel = DateOnly.TryParse(action.DueDate, out var due)
@@ -276,6 +302,8 @@ else
         _pendingAction = null;
         if (action.Action == "add_todo")
             await ExecuteAddTodoAsync(action);
+        else if (action.Action == "add_supply")
+            await ExecuteAddSupplyAsync(action);
         else
             await ExecuteAddTaskAsync(action);
         _confirmBusy = false;
@@ -376,6 +404,52 @@ else
                 " pour " + string.Join(", ", personIds
                     .Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
             _messages.Add(new ChatMessage($"✅ Todo ajouté : « {title} »{dateStr}{who}.", IsUser: false, IsAction: true));
+        }
+        else
+        {
+            _messages.Add(new ChatMessage($"⚠️ Impossible d'enregistrer : {error}", IsUser: false, IsAction: true));
+        }
+    }
+
+    private async Task ExecuteAddSupplyAsync(AssistantAction action)
+    {
+        if (!Store.CanEdit)
+        {
+            _messages.Add(new ChatMessage("⚠️ Mode lecture seule — impossible d'ajouter du matériel.", IsUser: false, IsAction: true));
+            return;
+        }
+
+        decimal? price = decimal.TryParse(
+            (action.Price ?? "").Replace(",", "."),
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var p) ? p : null;
+
+        var loc = string.IsNullOrWhiteSpace(action.Location) || action.Location == "null" ? null : action.Location;
+        var notes = string.IsNullOrWhiteSpace(action.Notes) || action.Notes == "null" ? null : action.Notes;
+        var link = string.IsNullOrWhiteSpace(action.Link) || action.Link == "null" ? null : action.Link;
+        var status = action.Status is "ordered" or "have" ? action.Status : "tobuy";
+
+        var supply = new MariagePlanning.Models.SupplyItem
+        {
+            Id       = $"s-{Guid.NewGuid():N}"[..12],
+            Name     = action.Title?.Trim() ?? "Article sans nom",
+            Category = string.IsNullOrWhiteSpace(action.Category) ? null : action.Category.Trim(),
+            Status   = status,
+            Quantity = Math.Max(1, action.Quantity),
+            Location = loc,
+            Notes    = notes,
+            Link     = link,
+            Price    = price
+        };
+
+        var (ok, error) = await Store.SaveAsync(data => { data.Supplies.Add(supply); return true; });
+
+        if (ok)
+        {
+            var statusLabel = status switch { "ordered" => "📦 commandé", "have" => "✅ en stock", _ => "🛒 à acheter" };
+            var qtyStr = supply.Quantity > 1 ? $" ×{supply.Quantity}" : "";
+            var priceStr = price.HasValue ? $" — {price.Value * supply.Quantity:0.00} €" : "";
+            _messages.Add(new ChatMessage($"✅ Matériel ajouté : « {supply.Name} »{qtyStr} ({statusLabel}{priceStr}).", IsUser: false, IsAction: true));
         }
         else
         {
