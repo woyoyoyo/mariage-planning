@@ -49,23 +49,34 @@ else
             @* Carte de confirmation avant sauvegarde *@
             @if (_pendingAction is not null)
             {
+                var isTodo = _pendingAction.Action == "add_todo";
                 <div class="chat-row chat-row-ai">
                     <div class="chat-avatar">🤖</div>
                     <div class="chat-confirm-card">
-                        <div class="chat-confirm-title">📋 Confirmer l'ajout ?</div>
-                        <div class="chat-confirm-field"><b>Tâche</b> : @_pendingAction.Title</div>
-                        <div class="chat-confirm-field"><b>Jour</b> : @_pendingDayLabel</div>
-                        @if (_pendingAction.Time is not null && _pendingAction.Time != "null")
+                        <div class="chat-confirm-title">@(isTodo ? "✅ Confirmer le todo ?" : "📋 Confirmer l'ajout ?")</div>
+                        <div class="chat-confirm-field"><b>@(isTodo ? "Todo" : "Tâche")</b> : @_pendingAction.Title</div>
+                        @if (isTodo)
                         {
-                            <div class="chat-confirm-field"><b>Heure</b> : @_pendingAction.Time</div>
+                            @if (_pendingDayLabel is not null)
+                            {
+                                <div class="chat-confirm-field"><b>Date limite</b> : @_pendingDayLabel</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="chat-confirm-field"><b>Jour</b> : @_pendingDayLabel</div>
+                            @if (_pendingAction.Time is not null && _pendingAction.Time != "null")
+                            {
+                                <div class="chat-confirm-field"><b>Heure</b> : @_pendingAction.Time</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_pendingAction.Location) && _pendingAction.Location != "null")
+                            {
+                                <div class="chat-confirm-field"><b>Lieu</b> : @_pendingAction.Location</div>
+                            }
                         }
                         @if (_pendingWho is not null)
                         {
                             <div class="chat-confirm-field"><b>Pour</b> : @_pendingWho</div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(_pendingAction.Location) && _pendingAction.Location != "null")
-                        {
-                            <div class="chat-confirm-field"><b>Lieu</b> : @_pendingAction.Location</div>
                         }
                         @if (!string.IsNullOrWhiteSpace(_pendingAction.Notes) && _pendingAction.Notes != "null")
                         {
@@ -197,7 +208,7 @@ else
                 _messages.Add(new ChatMessage(displayText, IsUser: false));
 
             // Mettre l'action en attente de confirmation
-            if (action is not null && action.Action == "add_task")
+            if (action is not null && (action.Action == "add_task" || action.Action == "add_todo"))
                 PrepareConfirmation(action);
         }
         catch (Exception ex)
@@ -216,27 +227,44 @@ else
     {
         _pendingAction = action;
 
-        // Libellé du jour
-        if (DateOnly.TryParse(action.Date, out var date))
+        if (action.Action == "add_todo")
         {
-            var day = Store.Data?.Days.FirstOrDefault(d => d.Date == date);
-            _pendingDayLabel = day is not null
-                ? $"{date:d MMMM} — {day.Label}"
-                : date.ToString("d MMMM");
-        }
-        else _pendingDayLabel = action.Date ?? "?";
+            // Date limite du todo
+            _pendingDayLabel = DateOnly.TryParse(action.DueDate, out var due)
+                ? due.ToString("d MMMM yyyy")
+                : null;
 
-        // Qui
-        if (action.AssignedTo is null || action.AssignedTo.Count == 0)
-        {
-            _pendingWho = "tout le monde";
+            // Personnes liées
+            var personNames = (action.PersonIds ?? [])
+                .Select(id => Store.Data?.People.FirstOrDefault(p => p.Id == id)?.Name ?? id)
+                .Where(n => n is not null)
+                .ToList();
+            _pendingWho = personNames.Count > 0 ? string.Join(", ", personNames) : null;
         }
         else
         {
-            var ids = GeminiService.ResolveAssignedIds(action.AssignedTo, Store.Data!.People, Store.Data!.Teams);
-            _pendingWho = ids.Count == 0
-                ? string.Join(", ", action.AssignedTo)
-                : string.Join(", ", ids.Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+            // Libellé du jour pour add_task
+            if (DateOnly.TryParse(action.Date, out var date))
+            {
+                var day = Store.Data?.Days.FirstOrDefault(d => d.Date == date);
+                _pendingDayLabel = day is not null
+                    ? $"{date:d MMMM} — {day.Label}"
+                    : date.ToString("d MMMM");
+            }
+            else _pendingDayLabel = action.Date ?? "?";
+
+            // Qui (personnes + équipes)
+            if (action.AssignedTo is null || action.AssignedTo.Count == 0)
+            {
+                _pendingWho = "tout le monde";
+            }
+            else
+            {
+                var ids = GeminiService.ResolveAssignedIds(action.AssignedTo, Store.Data!.People, Store.Data!.Teams);
+                _pendingWho = ids.Count == 0
+                    ? string.Join(", ", action.AssignedTo)
+                    : string.Join(", ", ids.Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+            }
         }
     }
 
@@ -246,14 +274,17 @@ else
         _confirmBusy = true;
         var action = _pendingAction;
         _pendingAction = null;
-        await ExecuteAddTaskAsync(action);
+        if (action.Action == "add_todo")
+            await ExecuteAddTodoAsync(action);
+        else
+            await ExecuteAddTaskAsync(action);
         _confirmBusy = false;
     }
 
     private void CancelAction()
     {
         _pendingAction = null;
-        _messages.Add(new ChatMessage("Annulé — la tâche n'a pas été ajoutée.", IsUser: false, IsAction: true));
+        _messages.Add(new ChatMessage("Annulé.", IsUser: false, IsAction: true));
     }
 
     private async Task ExecuteAddTaskAsync(AssistantAction action)
@@ -308,6 +339,47 @@ else
         else
         {
             _messages.Add(new ChatMessage($"⚠️ Impossible d'enregistrer : {error ?? "jour introuvable dans le planning."}", IsUser: false, IsAction: true));
+        }
+    }
+
+    private async Task ExecuteAddTodoAsync(AssistantAction action)
+    {
+        if (!Store.CanEdit)
+        {
+            _messages.Add(new ChatMessage("⚠️ Mode lecture seule — je ne peux pas créer de todo.", IsUser: false, IsAction: true));
+            return;
+        }
+
+        DateOnly? dueDate = DateOnly.TryParse(action.DueDate, out var d) ? d : null;
+        var title = action.Title?.Trim() ?? "Todo sans titre";
+        var notes = string.IsNullOrWhiteSpace(action.Notes) || action.Notes == "null" ? null : action.Notes;
+        var personIds = (action.PersonIds ?? [])
+            .Where(id => Store.Data!.People.Any(p => p.Id == id))
+            .ToList();
+
+        var todo = new MariagePlanning.Models.TodoItem
+        {
+            Id        = $"td-{Guid.NewGuid():N}"[..14],
+            Title     = title,
+            DueDate   = dueDate,
+            Notes     = notes,
+            PersonIds = personIds,
+            Status    = "todo"
+        };
+
+        var (ok, error) = await Store.SaveAsync(data => { data.Todos.Add(todo); return true; });
+
+        if (ok)
+        {
+            var dateStr = dueDate.HasValue ? $" avant le {dueDate.Value:d MMMM yyyy}" : "";
+            var who = personIds.Count == 0 ? "" :
+                " pour " + string.Join(", ", personIds
+                    .Select(id => Store.Data!.People.FirstOrDefault(p => p.Id == id)?.Name ?? id));
+            _messages.Add(new ChatMessage($"✅ Todo ajouté : « {title} »{dateStr}{who}.", IsUser: false, IsAction: true));
+        }
+        else
+        {
+            _messages.Add(new ChatMessage($"⚠️ Impossible d'enregistrer : {error}", IsUser: false, IsAction: true));
         }
     }
 

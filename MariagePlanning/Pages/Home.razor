@@ -200,6 +200,20 @@ else
             }
         </a>
 
+        @* ── Matériel ─────────────────────────────────────────────────── *@
+        @{
+            var supplyToBuy   = Store.Data.Supplies.Count(s => s.Status == "tobuy");
+            var supplyOrdered = Store.Data.Supplies.Count(s => s.Status == "ordered");
+        }
+        <a class="tile @(supplyToBuy > 0 ? "tile-supply" : "tile-muted")" href="materiel">
+            <div class="tile-big-num">@supplyToBuy</div>
+            <div class="tile-tag">À ACHETER</div>
+            @if (supplyOrdered > 0)
+            {
+                <div class="tile-sub" style="font-size:10px;opacity:.85">📦 @supplyOrdered commandé@(supplyOrdered > 1 ? "s" : "")</div>
+            }
+        </a>
+
         @* ── Rappel todos à venir ─────────────────────────────────────── *@
         @{
             var upcomingTodos = Store.Data.Todos

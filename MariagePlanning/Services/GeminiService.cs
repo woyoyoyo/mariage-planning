@@ -11,12 +11,14 @@ public record ChatMessage(string Text, bool IsUser, bool IsAction = false);
 public class AssistantAction
 {
     [JsonPropertyName("action")]    public string       Action     { get; set; } = "";
-    [JsonPropertyName("date")]      public string?      Date       { get; set; }
+    [JsonPropertyName("date")]      public string?      Date       { get; set; }  // pour add_task
+    [JsonPropertyName("dueDate")]   public string?      DueDate    { get; set; }  // pour add_todo
     [JsonPropertyName("title")]     public string?      Title      { get; set; }
     [JsonPropertyName("time")]      public string?      Time       { get; set; }
     [JsonPropertyName("location")]  public string?      Location   { get; set; }
     [JsonPropertyName("notes")]     public string?      Notes      { get; set; }
     [JsonPropertyName("assignedTo")]public List<string> AssignedTo { get; set; } = [];
+    [JsonPropertyName("personIds")] public List<string> PersonIds  { get; set; } = [];
 }
 
 public class GeminiService(SettingsService settings)
@@ -155,17 +157,30 @@ public class GeminiService(SettingsService settings)
         sb.AppendLine();
 
         sb.AppendLine("INSTRUCTIONS :");
-        sb.AppendLine("- Pour CRÉER une tâche : réponds d'abord en texte naturel, PUIS ajoute un bloc JSON :");
+        sb.AppendLine("Il existe DEUX types de création :");
+        sb.AppendLine();
+        sb.AppendLine("1) TÂCHE de planning (sur un jour précis du planning) → action add_task :");
         sb.AppendLine("  ```json");
         sb.AppendLine("  {\"action\":\"add_task\",\"date\":\"YYYY-MM-DD\",\"title\":\"...\",\"time\":\"HH:MM ou null\",\"location\":null,\"notes\":null,\"assignedTo\":[\"id_personne_ou_equipe\"]}");
         sb.AppendLine("  ```");
-        sb.AppendLine("- assignedTo peut contenir des IDs de personnes ET/OU des IDs d'équipes.");
-        sb.AppendLine("- Pour 'tout le monde' : assignedTo = []");
-        sb.AppendLine("- Si la tâche concerne une équipe connue, utilise son ID d'équipe directement.");
-        sb.AppendLine("- Si l'assignation n'est pas claire : DEMANDE si c'est pour tout le monde, une personne ou une équipe, en listant les options disponibles.");
-        sb.AppendLine("- Si la date ou le titre manquent : POSE UNE QUESTION avant d'émettre le JSON.");
+        sb.AppendLine("  - La date DOIT correspondre à un jour existant dans le planning listé ci-dessus.");
+        sb.AppendLine("  - assignedTo peut contenir des IDs de personnes ET/OU des IDs d'équipes.");
+        sb.AppendLine("  - Pour 'tout le monde' : assignedTo = []");
+        sb.AppendLine();
+        sb.AppendLine("2) TODO (élément de liste de choses à faire, avec date butoir) → action add_todo :");
+        sb.AppendLine("  ```json");
+        sb.AppendLine("  {\"action\":\"add_todo\",\"title\":\"...\",\"dueDate\":\"YYYY-MM-DD ou null\",\"notes\":null,\"personIds\":[\"id_personne\"]}");
+        sb.AppendLine("  ```");
+        sb.AppendLine("  - personIds contient les IDs de PERSONNES uniquement (pas d'équipes).");
+        sb.AppendLine("  - dueDate est la date limite (peut être null si pas de deadline).");
+        sb.AppendLine();
+        sb.AppendLine("RÈGLES COMMUNES :");
+        sb.AppendLine("- Si la demande porte sur quelque chose à FAIRE/PRÉPARER/ACHETER sans être sur un jour précis du planning → utilise add_todo.");
+        sb.AppendLine("- Si la demande porte sur un événement/tâche sur un jour précis du planning → utilise add_task.");
+        sb.AppendLine("- Si le titre manque : POSE UNE QUESTION avant d'émettre le JSON.");
+        sb.AppendLine("- Réponds d'abord en texte naturel, PUIS ajoute le bloc JSON.");
         sb.AppendLine("- Pour LIRE le planning : réponds en texte naturel, liste les tâches pertinentes.");
-        sb.AppendLine("- Tu ne peux pas modifier ni supprimer des tâches existantes.");
+        sb.AppendLine("- Tu ne peux pas modifier ni supprimer des éléments existants.");
 
         return sb.ToString();
     }

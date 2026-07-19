@@ -3184,3 +3184,127 @@ button.tile:disabled { opacity: 0.45; }
 .chat-confirm-ok     { background: var(--color-done);  color: #fff; }
 .chat-confirm-cancel { background: var(--color-alert-soft); color: var(--color-alert); border: 1px solid var(--color-alert); }
 .chat-confirm-ok:disabled, .chat-confirm-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ==========================================================================
+   Matériel
+   ========================================================================== */
+
+.tile-supply {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+}
+
+.supply-budget-bar {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.supply-group { margin-bottom: 4px; }
+
+.supply-group-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding: 10px 2px 4px;
+}
+
+.supply-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+
+.supply-card.supply-have {
+    opacity: 0.6;
+}
+
+.supply-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.supply-status-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.supply-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.supply-qty {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    padding: 1px 6px;
+    border-radius: 99px;
+}
+
+.supply-detail {
+    display: block;
+    font-size: 0.83rem;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+    text-decoration: none;
+}
+
+.supply-loc-link, .supply-link { color: var(--color-primary); }
+
+.supply-notes { margin: 0; }
+
+.supply-unit-price {
+    font-size: 0.78rem;
+    opacity: .7;
+}
+
+/* Formulaire matériel */
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 80px;
+    gap: 10px;
+}
+
+.supply-status-checks {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.supply-status-opt {
+    flex: 1;
+    min-width: 90px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 0.83rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background .15s, border-color .15s;
+}
+
+.supply-status-opt.is-checked {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+}

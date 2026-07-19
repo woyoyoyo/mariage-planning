@@ -10,6 +10,7 @@ public class WeddingData
     public List<Venue> Venues { get; set; } = [];
     public List<WeddingDay> Days { get; set; } = [];
     public List<TodoItem> Todos { get; set; } = [];
+    public List<SupplyItem> Supplies { get; set; } = [];
 }
 
 public class Venue
@@ -94,6 +95,20 @@ public class TaskItem
     public string? VenueId { get; set; }
 
     public bool IsDone => Status == "done";
+}
+
+public class SupplyItem
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Category { get; set; }
+    public string Status { get; set; } = "tobuy";  // tobuy | ordered | have
+    public int Quantity { get; set; } = 1;
+    public string? Location { get; set; }           // ex : "Chez Marie", "Cave"
+    public string? VenueId { get; set; }
+    public string? Notes { get; set; }
+    public string? Link { get; set; }               // lien d'achat
+    public decimal? Price { get; set; }             // prix unitaire estimé
 }
 
 public class TodoItem

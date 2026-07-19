@@ -1,0 +1,405 @@
+@page "/materiel"
+@implements IDisposable
+@inject WeddingStore Store
+
+<PageTitle>Mariage Planning — Matériel</PageTitle>
+
+<header class="page-header no-print">
+    <h1>📦 Matériel</h1>
+</header>
+
+@if (Store.Data is null)
+{
+    <div class="loading-message">Chargement…</div>
+}
+else
+{
+    @* ── Barre d'onglets ── *@
+    <div class="tab-bar no-print">
+        <button class="tab @(_tab == Tab.ToBuy ? "tab-active" : "")" @onclick='() => _tab = Tab.ToBuy'>
+            🛒 À acheter
+            <span class="tab-count">@Store.Data.Supplies.Count(s => s.Status == "tobuy")</span>
+        </button>
+        <button class="tab @(_tab == Tab.Ordered ? "tab-active" : "")" @onclick='() => _tab = Tab.Ordered'>
+            📦 Commandé
+            <span class="tab-count">@Store.Data.Supplies.Count(s => s.Status == "ordered")</span>
+        </button>
+        <button class="tab @(_tab == Tab.Have ? "tab-active" : "")" @onclick='() => _tab = Tab.Have'>
+            ✅ En stock
+            <span class="tab-count">@Store.Data.Supplies.Count(s => s.Status == "have")</span>
+        </button>
+        <button class="tab @(_tab == Tab.All ? "tab-active" : "")" @onclick='() => _tab = Tab.All'>
+            📋 Tout
+            <span class="tab-count">@Store.Data.Supplies.Count</span>
+        </button>
+    </div>
+
+    <div class="no-print">
+
+    @* ── Résumé budget À acheter ── *@
+    @if (_tab == Tab.ToBuy)
+    {
+        var totalBudget = Store.Data.Supplies
+            .Where(s => s.Status == "tobuy" && s.Price.HasValue)
+            .Sum(s => s.Price!.Value * s.Quantity);
+        if (totalBudget > 0)
+        {
+            <div class="supply-budget-bar">
+                💰 Budget estimé à acheter : <strong>@totalBudget.ToString("0.00") €</strong>
+            </div>
+        }
+    }
+
+    @* ── Liste des articles ── *@
+    @{
+        var filtered = TabItems.ToList();
+        var groups = filtered
+            .GroupBy(s => string.IsNullOrWhiteSpace(s.Category) ? "—" : s.Category)
+            .OrderBy(g => g.Key)
+            .ToList();
+    }
+
+    @if (filtered.Count == 0 && !_addingNew)
+    {
+        <div class="empty-message">
+            @if (_tab == Tab.ToBuy) { <span>Rien à acheter pour l'instant.</span> }
+            else if (_tab == Tab.Ordered) { <span>Aucun article commandé.</span> }
+            else if (_tab == Tab.Have) { <span>Aucun article en stock.</span> }
+            else { <span>Aucun article enregistré.</span> }
+        </div>
+    }
+
+    @foreach (var group in groups)
+    {
+        <div class="supply-group">
+            @if (group.Key != "—")
+            {
+                <div class="supply-group-label">@group.Key</div>
+            }
+            @foreach (var item in group.OrderBy(s => s.Name))
+            {
+                var sid = item.Id;
+                @if (_editingId == sid)
+                {
+                    <div class="add-form edit-form supply-form">
+                        @SupplyFields()
+                        @if (_error is not null)
+                        {
+                            <div class="sync-status sync-warn">⚠️ @_error</div>
+                        }
+                        <div class="add-form-actions">
+                            <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                            <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
+                                    disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                                @(_busy ? "⏳…" : "💾 Enregistrer")
+                            </button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="supply-card @("supply-" + item.Status)">
+                        <div class="supply-card-head">
+                            <button class="supply-status-btn" @onclick="() => CycleStatusAsync(sid)"
+                                    title="Changer le statut">
+                                @StatusIcon(item.Status)
+                            </button>
+                            <span class="supply-name">@item.Name</span>
+                            @if (item.Quantity > 1)
+                            {
+                                <span class="supply-qty">×@item.Quantity</span>
+                            }
+                            @if (Store.CanEdit)
+                            {
+                                <div class="people-row-actions">
+                                    <button class="btn-card-icon" @onclick="() => StartEdit(item)" title="Modifier">✏️</button>
+                                    <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(sid)" title="Supprimer">🗑️</button>
+                                </div>
+                            }
+                        </div>
+                        @if (item.Price.HasValue)
+                        {
+                            <div class="supply-detail">
+                                💰 @((item.Price.Value * item.Quantity).ToString("0.00")) €
+                                @if (item.Quantity > 1) { <span class="supply-unit-price">(@item.Price.Value.ToString("0.00") € × @item.Quantity)</span> }
+                            </div>
+                        }
+                        @{
+                            var venue = item.VenueId is not null ? Store.VenueById(item.VenueId) : null;
+                            var locLabel = venue?.Name ?? item.Location;
+                            var locAddress = venue?.Address ?? item.Location;
+                        }
+                        @if (locLabel is not null)
+                        {
+                            @if (locAddress is not null)
+                            {
+                                <a href="@MapsUrl(locAddress)" target="_blank" rel="noopener" class="supply-detail supply-loc-link">
+                                    📍 @locLabel
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="supply-detail">📍 @locLabel</span>
+                            }
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                        {
+                            <p class="supply-detail supply-notes">💡 @item.Notes</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.Link))
+                        {
+                            <a href="@item.Link" target="_blank" rel="noopener" class="supply-detail supply-link">
+                                🔗 @DisplayLink(item.Link)
+                            </a>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    @* ── Formulaire d'ajout ── *@
+    @if (Store.CanEdit)
+    {
+        @if (_addingNew)
+        {
+            <div class="add-form supply-form">
+                @SupplyFields()
+                @if (_error is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_error</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveAddAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                        @(_busy ? "⏳…" : "➕ Ajouter")
+                    </button>
+                </div>
+            </div>
+        }
+        else if (_editingId is null)
+        {
+            <button class="action-btn btn-add contact-add-btn" @onclick="StartAdd">
+                ➕ Ajouter un article
+            </button>
+        }
+    }
+
+    </div>
+}
+
+@code {
+    private enum Tab { ToBuy, Ordered, Have, All }
+    private Tab _tab = Tab.ToBuy;
+
+    private bool _addingNew;
+    private string? _editingId;
+    private bool _busy;
+    private string? _error;
+
+    private string? _fName;
+    private string? _fCategory;
+    private string  _fStatus = "tobuy";
+    private int     _fQty = 1;
+    private string? _fLocation;
+    private string  _fVenueId = "";
+    private string? _fNotes;
+    private string? _fLink;
+    private string? _fPrice;
+
+    private IEnumerable<SupplyItem> TabItems => _tab switch
+    {
+        Tab.ToBuy   => Store.Data?.Supplies.Where(s => s.Status == "tobuy")   ?? [],
+        Tab.Ordered => Store.Data?.Supplies.Where(s => s.Status == "ordered") ?? [],
+        Tab.Have    => Store.Data?.Supplies.Where(s => s.Status == "have")    ?? [],
+        _           => Store.Data?.Supplies ?? []
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.Changed += OnChanged;
+        await Store.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Store.Changed -= OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void StartAdd()
+    {
+        _addingNew = true; _editingId = null; _error = null;
+        _fName = null; _fCategory = null; _fStatus = StatusForTab();
+        _fQty = 1; _fLocation = null; _fVenueId = ""; _fNotes = null; _fLink = null; _fPrice = null;
+    }
+
+    private void StartEdit(SupplyItem s)
+    {
+        _editingId = s.Id; _addingNew = false; _error = null;
+        _fName = s.Name; _fCategory = s.Category; _fStatus = s.Status;
+        _fQty = s.Quantity; _fLocation = s.Location;
+        _fVenueId = s.VenueId ?? (s.Location is not null ? "__custom" : "");
+        _fNotes = s.Notes; _fLink = s.Link;
+        _fPrice = s.Price.HasValue ? s.Price.Value.ToString("0.00") : null;
+    }
+
+    private void CancelForm() { _addingNew = false; _editingId = null; _error = null; }
+
+    private string StatusForTab() => _tab switch
+    {
+        Tab.Ordered => "ordered",
+        Tab.Have    => "have",
+        _           => "tobuy"
+    };
+
+    private async Task SaveAddAsync()
+    {
+        _busy = true; _error = null;
+        var id = Guid.NewGuid().ToString("N")[..10];
+        var s = BuildItem(id);
+        var (ok, err) = await Store.SaveAsync(data => { data.Supplies.Add(s); return true; });
+        _busy = false;
+        if (ok) _addingNew = false;
+        else _error = err;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        _busy = true; _error = null;
+        var id = _editingId!;
+        var s = BuildItem(id);
+        var (ok, err) = await Store.SaveAsync(data =>
+        {
+            var idx = data.Supplies.FindIndex(x => x.Id == id);
+            if (idx < 0) return false;
+            data.Supplies[idx] = s;
+            return true;
+        });
+        _busy = false;
+        if (ok) _editingId = null;
+        else _error = err;
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        await Store.SaveAsync(data => { data.Supplies.RemoveAll(s => s.Id == id); return true; });
+    }
+
+    private async Task CycleStatusAsync(string id)
+    {
+        if (!Store.CanEdit) return;
+        await Store.SaveAsync(data =>
+        {
+            var s = data.Supplies.FirstOrDefault(x => x.Id == id);
+            if (s is null) return false;
+            s.Status = s.Status switch { "tobuy" => "ordered", "ordered" => "have", _ => "tobuy" };
+            return true;
+        });
+    }
+
+    private SupplyItem BuildItem(string id)
+    {
+        var venueId  = _fVenueId is "" or "__custom" ? null : _fVenueId;
+        var location = venueId is null && !string.IsNullOrWhiteSpace(_fLocation) ? _fLocation.Trim() : null;
+        decimal? price = decimal.TryParse(_fPrice?.Replace(",", "."),
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var p) ? p : null;
+        return new SupplyItem
+        {
+            Id       = id,
+            Name     = _fName!.Trim(),
+            Category = string.IsNullOrWhiteSpace(_fCategory) ? null : _fCategory.Trim(),
+            Status   = _fStatus,
+            Quantity = Math.Max(1, _fQty),
+            Location = location,
+            VenueId  = venueId,
+            Notes    = string.IsNullOrWhiteSpace(_fNotes) ? null : _fNotes.Trim(),
+            Link     = string.IsNullOrWhiteSpace(_fLink)  ? null : _fLink.Trim(),
+            Price    = price
+        };
+    }
+
+    private static string StatusIcon(string status) => status switch
+    {
+        "ordered" => "📦",
+        "have"    => "✅",
+        _         => "🛒"
+    };
+
+    private static string MapsUrl(string address) =>
+        $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(address)}";
+
+    private static string DisplayLink(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var host = uri.Host.TrimStart('w').TrimStart('w').TrimStart('w').TrimStart('.');
+            return host;
+        }
+        catch { return url.Length > 40 ? url[..40] + "…" : url; }
+    }
+
+    private RenderFragment SupplyFields() => __builder =>
+    {
+        <label class="form-field">
+            <span class="form-label">Nom *</span>
+            <input class="form-input" type="text" @bind="_fName"
+                   placeholder="ex : Guirlandes lumineuses" autocapitalize="sentences" />
+        </label>
+        <div class="form-row-2">
+            <label class="form-field">
+                <span class="form-label">Catégorie</span>
+                <input class="form-input" type="text" @bind="_fCategory"
+                       placeholder="ex : Décoration" autocapitalize="sentences" />
+            </label>
+            <label class="form-field">
+                <span class="form-label">Quantité</span>
+                <input class="form-input" type="number" @bind="_fQty" min="1" />
+            </label>
+        </div>
+        <div class="form-field">
+            <span class="form-label">Statut</span>
+            <div class="supply-status-checks">
+                <button type="button" class="supply-status-opt @(_fStatus == "tobuy" ? "is-checked" : "")"
+                        @onclick='() => _fStatus = "tobuy"'>🛒 À acheter</button>
+                <button type="button" class="supply-status-opt @(_fStatus == "ordered" ? "is-checked" : "")"
+                        @onclick='() => _fStatus = "ordered"'>📦 Commandé</button>
+                <button type="button" class="supply-status-opt @(_fStatus == "have" ? "is-checked" : "")"
+                        @onclick='() => _fStatus = "have"'>✅ En stock</button>
+            </div>
+        </div>
+        <label class="form-field">
+            <span class="form-label">💰 Prix unitaire (€) <span class="form-hint-inline">(optionnel)</span></span>
+            <input class="form-input" type="text" inputmode="decimal" @bind="_fPrice"
+                   placeholder="ex : 12.50" />
+        </label>
+        <div class="form-field">
+            <span class="form-label">📍 Où <span class="form-hint-inline">(où c'est / où ça va)</span></span>
+            @if ((Store.Data?.Venues.Count ?? 0) > 0)
+            {
+                <select class="form-input" @bind="_fVenueId">
+                    <option value="">— Choisir un lieu —</option>
+                    @foreach (var v in Store.Data!.Venues)
+                    {
+                        <option value="@v.Id">@v.Name</option>
+                    }
+                    <option value="__custom">✏️ Saisir un emplacement</option>
+                </select>
+            }
+            @if ((Store.Data?.Venues.Count ?? 0) == 0 || _fVenueId == "__custom")
+            {
+                <input class="form-input" style="margin-top:4px" type="text" @bind="_fLocation"
+                       placeholder="ex : Chez Marie, cave du bas" autocapitalize="sentences" />
+            }
+        </div>
+        <label class="form-field">
+            <span class="form-label">🔗 Lien d'achat <span class="form-hint-inline">(optionnel)</span></span>
+            <input class="form-input" type="url" @bind="_fLink" placeholder="https://…" />
+        </label>
+        <label class="form-field">
+            <span class="form-label">💡 Notes <span class="form-hint-inline">(optionnel)</span></span>
+            <textarea class="form-input form-textarea" @bind="_fNotes" rows="2"
+                      placeholder="ex : Couleur blanc chaud, min 10m"></textarea>
+        </label>
+    };
+}
