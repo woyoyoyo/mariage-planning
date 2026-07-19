@@ -3215,6 +3215,45 @@ button.tile:disabled { opacity: 0.45; }
     padding: 10px 2px 4px;
 }
 
+/* Groupement par lieu */
+.supply-loc-section {
+    margin-bottom: 18px;
+}
+
+.supply-loc-header {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-primary);
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+    margin-top: 6px;
+}
+
+/* Sous-groupe statut dans vue Tout */
+.supply-status-section {
+    margin-bottom: 10px;
+}
+
+.supply-status-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 5px;
+}
+
+/* Chip catégorie sur la carte */
+.supply-cat-chip {
+    font-size: 0.72rem;
+    background: var(--color-border);
+    color: var(--color-text-muted);
+    padding: 1px 6px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
 .supply-card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);

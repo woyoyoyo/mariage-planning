@@ -50,109 +50,55 @@ else
         }
     }
 
-    @* ── Liste des articles ── *@
+    @* ── Articles groupés par lieu ── *@
     @{
         var filtered = TabItems.ToList();
-        var groups = filtered
-            .GroupBy(s => string.IsNullOrWhiteSpace(s.Category) ? "—" : s.Category)
-            .OrderBy(g => g.Key)
+        var byLoc    = filtered
+            .GroupBy(s => LocKey(s))
+            .OrderBy(g => g.Key == "Sans emplacement" ? "zzz" : g.Key)
             .ToList();
     }
 
     @if (filtered.Count == 0 && !_addingNew)
     {
         <div class="empty-message">
-            @if (_tab == Tab.ToBuy) { <span>Rien à acheter pour l'instant.</span> }
+            @if (_tab == Tab.ToBuy)    { <span>Rien à acheter pour l'instant.</span> }
             else if (_tab == Tab.Ordered) { <span>Aucun article commandé.</span> }
-            else if (_tab == Tab.Have) { <span>Aucun article en stock.</span> }
-            else { <span>Aucun article enregistré.</span> }
+            else if (_tab == Tab.Have)    { <span>Aucun article en stock.</span> }
+            else                          { <span>Aucun article enregistré.</span> }
         </div>
     }
 
-    @foreach (var group in groups)
+    @foreach (var locGroup in byLoc)
     {
-        <div class="supply-group">
-            @if (group.Key != "—")
+        <div class="supply-loc-section">
+            <div class="supply-loc-header">📍 @locGroup.Key</div>
+
+            @if (_tab == Tab.All)
             {
-                <div class="supply-group-label">@group.Key</div>
-            }
-            @foreach (var item in group.OrderBy(s => s.Name))
-            {
-                var sid = item.Id;
-                @if (_editingId == sid)
+                @* Vue Tout : sous-grouper par statut dans chaque lieu *@
+                @foreach (var st in new[] { "tobuy", "ordered", "have" })
                 {
-                    <div class="add-form edit-form supply-form">
-                        @SupplyFields()
-                        @if (_error is not null)
-                        {
-                            <div class="sync-status sync-warn">⚠️ @_error</div>
-                        }
-                        <div class="add-form-actions">
-                            <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
-                            <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
-                                    disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
-                                @(_busy ? "⏳…" : "💾 Enregistrer")
-                            </button>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="supply-card @("supply-" + item.Status)">
-                        <div class="supply-card-head">
-                            <button class="supply-status-btn" @onclick="() => CycleStatusAsync(sid)"
-                                    title="Changer le statut">
-                                @StatusIcon(item.Status)
-                            </button>
-                            <span class="supply-name">@item.Name</span>
-                            @if (item.Quantity > 1)
-                            {
-                                <span class="supply-qty">×@item.Quantity</span>
-                            }
-                            @if (Store.CanEdit)
-                            {
-                                <div class="people-row-actions">
-                                    <button class="btn-card-icon" @onclick="() => StartEdit(item)" title="Modifier">✏️</button>
-                                    <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(sid)" title="Supprimer">🗑️</button>
-                                </div>
-                            }
-                        </div>
-                        @if (item.Price.HasValue)
-                        {
-                            <div class="supply-detail">
-                                💰 @((item.Price.Value * item.Quantity).ToString("0.00")) €
-                                @if (item.Quantity > 1) { <span class="supply-unit-price">(@item.Price.Value.ToString("0.00") € × @item.Quantity)</span> }
+                    var stItems = locGroup.Where(s => s.Status == st).OrderBy(s => s.Name).ToList();
+                    @if (stItems.Count > 0)
+                    {
+                        <div class="supply-status-section">
+                            <div class="supply-status-label">
+                                @StatusIcon(st) @(st switch { "ordered" => "Commandé", "have" => "En stock", _ => "À acheter" })
                             </div>
-                        }
-                        @{
-                            var venue = item.VenueId is not null ? Store.VenueById(item.VenueId) : null;
-                            var locLabel = venue?.Name ?? item.Location;
-                            var locAddress = venue?.Address ?? item.Location;
-                        }
-                        @if (locLabel is not null)
-                        {
-                            @if (locAddress is not null)
+                            @foreach (var item in stItems)
                             {
-                                <a href="@MapsUrl(locAddress)" target="_blank" rel="noopener" class="supply-detail supply-loc-link">
-                                    📍 @locLabel
-                                </a>
+                                @RenderCard(item)
                             }
-                            else
-                            {
-                                <span class="supply-detail">📍 @locLabel</span>
-                            }
-                        }
-                        @if (!string.IsNullOrWhiteSpace(item.Notes))
-                        {
-                            <p class="supply-detail supply-notes">💡 @item.Notes</p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(item.Link))
-                        {
-                            <a href="@item.Link" target="_blank" rel="noopener" class="supply-detail supply-link">
-                                🔗 @DisplayLink(item.Link)
-                            </a>
-                        }
-                    </div>
+                        </div>
+                    }
+                }
+            }
+            else
+            {
+                @foreach (var item in locGroup.OrderBy(s => s.Name))
+                {
+                    @RenderCard(item)
                 }
             }
         </div>
@@ -215,6 +161,15 @@ else
         Tab.Have    => Store.Data?.Supplies.Where(s => s.Status == "have")    ?? [],
         _           => Store.Data?.Supplies ?? []
     };
+
+    private string LocKey(SupplyItem s)
+    {
+        if (s.VenueId is not null)
+            return Store.VenueById(s.VenueId)?.Name ?? "Sans emplacement";
+        if (!string.IsNullOrWhiteSpace(s.Location))
+            return s.Location;
+        return "Sans emplacement";
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -338,6 +293,70 @@ else
         }
         catch { return url.Length > 40 ? url[..40] + "…" : url; }
     }
+
+    private RenderFragment RenderCard(SupplyItem item) => __builder =>
+    {
+        var sid = item.Id;
+        if (_editingId == sid)
+        {
+            <div class="add-form edit-form supply-form">
+                @SupplyFields()
+                @if (_error is not null)
+                {
+                    <div class="sync-status sync-warn">⚠️ @_error</div>
+                }
+                <div class="add-form-actions">
+                    <button class="action-btn btn-clear" @onclick="CancelForm" disabled="@_busy">Annuler</button>
+                    <button class="action-btn btn-refresh" @onclick="SaveEditAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_fName))">
+                        @(_busy ? "⏳…" : "💾 Enregistrer")
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="supply-card @("supply-" + item.Status)">
+                <div class="supply-card-head">
+                    <button class="supply-status-btn" @onclick="() => CycleStatusAsync(sid)"
+                            title="Changer le statut">@StatusIcon(item.Status)</button>
+                    <span class="supply-name">@item.Name</span>
+                    @if (!string.IsNullOrWhiteSpace(item.Category))
+                    {
+                        <span class="supply-cat-chip">@item.Category</span>
+                    }
+                    @if (item.Quantity > 1)
+                    {
+                        <span class="supply-qty">×@item.Quantity</span>
+                    }
+                    @if (Store.CanEdit)
+                    {
+                        <div class="people-row-actions">
+                            <button class="btn-card-icon" @onclick="() => StartEdit(item)" title="Modifier">✏️</button>
+                            <button class="btn-card-icon people-delete" @onclick="() => DeleteAsync(sid)" title="Supprimer">🗑️</button>
+                        </div>
+                    }
+                </div>
+                @if (item.Price.HasValue)
+                {
+                    <div class="supply-detail">
+                        💰 @((item.Price.Value * item.Quantity).ToString("0.00")) €
+                        @if (item.Quantity > 1) { <span class="supply-unit-price">(@item.Price.Value.ToString("0.00") € × @item.Quantity)</span> }
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                {
+                    <p class="supply-detail supply-notes">💡 @item.Notes</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(item.Link))
+                {
+                    <a href="@item.Link" target="_blank" rel="noopener" class="supply-detail supply-link">
+                        🔗 @DisplayLink(item.Link)
+                    </a>
+                }
+            </div>
+        }
+    };
 
     private RenderFragment SupplyFields() => __builder =>
     {
