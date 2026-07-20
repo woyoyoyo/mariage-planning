@@ -167,9 +167,10 @@ else
             {
                 <div class="tile-avatar">@_currentPerson.Name[0]</div>
                 <div class="tile-sub">@_currentPerson.Name</div>
+                <div class="tile-tag">MON PLANNING</div>
                 @if (_myTotal > 0)
                 {
-                    <div class="tile-tag">@_myTotal tâche@(_myTotal > 1 ? "s" : "")</div>
+                    <div class="tile-sub" style="font-size:10px;opacity:.85">📅 @_myTotal tâche@(_myTotal > 1 ? "s" : "") au planning</div>
                 }
             }
             else

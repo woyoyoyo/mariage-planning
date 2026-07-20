@@ -29,7 +29,7 @@ else if (_person is not null)
         </div>
     </div>
 
-    @foreach (var day in Store.Data!.Days)
+    @foreach (var day in Store.OrderedDays)
     {
         var myTasks = day.Activities
             .Where(t => WeddingStore.ConcernsPerson(t, _person.Id))
