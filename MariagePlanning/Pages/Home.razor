@@ -37,8 +37,8 @@ else
     @* ── Planning complet pour impression (masqué à l'écran) ────────────── *@
     <div class="print-planning">
         <h1 class="print-planning-title">@Store.Data.Wedding.Name</h1>
-        <p class="print-planning-date">Planning complet — imprimé le @DateTime.Now.ToString("d MMMM yyyy")</p>
-        @foreach (var day in Store.OrderedDays)
+        <p class="print-planning-date">Planning vendredi & samedi — imprimé le @DateTime.Now.ToString("d MMMM yyyy")</p>
+        @foreach (var day in Store.OrderedDays.Where(d => d.Date.DayOfWeek is DayOfWeek.Friday or DayOfWeek.Saturday))
         {
             <div class="print-day-block">
                 <h2 class="print-day-heading">
@@ -122,6 +122,41 @@ else
             </a>
         }
 
+        @* ── Mon planning — tuile mise en avant ──────────────────────── *@
+        <a class="tile tile-full tile-planning @(_currentPerson is null ? "tile-planning-empty" : "")"
+           href="moi"
+           style="@(_currentPerson is not null ? $"--person-color:{_currentPerson.Color}" : "")">
+            @if (_currentPerson is not null)
+            {
+                <div class="tile-planning-avatar">@_currentPerson.Name[0]</div>
+                <div class="tile-planning-body">
+                    <div class="tile-eyebrow">👤 MON PLANNING</div>
+                    <div class="tile-planning-name">@_currentPerson.Name</div>
+                    <div class="tile-planning-meta">
+                        @if (_myTotal > 0)
+                        {
+                            <span>📅 @_myTotal tâche@(_myTotal > 1 ? "s" : "") au planning</span>
+                        }
+                        else
+                        {
+                            <span>Aucune tâche assignée pour l'instant</span>
+                        }
+                    </div>
+                </div>
+                <div class="tile-planning-arrow">→</div>
+            }
+            else
+            {
+                <div class="tile-planning-avatar tile-planning-avatar-empty">👤</div>
+                <div class="tile-planning-body">
+                    <div class="tile-eyebrow">👤 MON PLANNING</div>
+                    <div class="tile-planning-name">Sélectionne ton profil</div>
+                    <div class="tile-planning-meta"><span>pour voir tes tâches perso →</span></div>
+                </div>
+                <div class="tile-planning-arrow">→</div>
+            }
+        </a>
+
         @* ── Une tuile par jour — avec compteur de tâches ───────────── *@
         @foreach (var day in Store.OrderedDays)
         {
@@ -158,27 +193,6 @@ else
                 </a>
             </div>
         }
-
-        @* ── Mon profil — lien vers planning perso ───────────────────── *@
-        <a class="tile @(_currentPerson is not null ? "tile-person" : "tile-muted")"
-           href="moi"
-           style="@(_currentPerson is not null ? $"--person-color:{_currentPerson.Color}" : "")">
-            @if (_currentPerson is not null)
-            {
-                <div class="tile-avatar">@_currentPerson.Name[0]</div>
-                <div class="tile-sub">@_currentPerson.Name</div>
-                <div class="tile-tag">MON PLANNING</div>
-                @if (_myTotal > 0)
-                {
-                    <div class="tile-sub" style="font-size:10px;opacity:.85">📅 @_myTotal tâche@(_myTotal > 1 ? "s" : "") au planning</div>
-                }
-            }
-            else
-            {
-                <div class="tile-icon-lg">👤</div>
-                <div class="tile-tag">MON PLANNING</div>
-            }
-        </a>
 
         @* ── Contacts ────────────────────────────────────────────────── *@
         <a class="tile tile-muted" href="contacts">

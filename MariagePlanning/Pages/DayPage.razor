@@ -50,6 +50,11 @@ else
         </div>
     </div>
 
+    <label class="day-filter-toggle no-print" title="Masquer les tâches assignées à tout le monde">
+        <input type="checkbox" @bind="_hideEveryone" />
+        <span>Masquer « Tout le monde »</span>
+    </label>
+
     <header class="page-header @(IsWeddingDay ? "day-header-wedding" : "")">
         <h1>@_day.Label</h1>
         <div class="wedding-sub">@FrenchDate.Long(_day.Date)</div>
@@ -98,9 +103,13 @@ else
             </div>
         }
 
-        @if (!_day.Activities.Any())
+        @if (!DayActivities.Any())
         {
-            <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+            <div class="empty-day">
+                @(_hideEveryone && _day.Activities.Any()
+                    ? "Aucune tâche assignée à quelqu'un en particulier ce jour-là."
+                    : "Rien de prévu ce jour-là pour l'instant.")
+            </div>
         }
     }
     else
@@ -155,9 +164,13 @@ else
             }
         </div>
 
-        @if (!_day.Activities.Any())
+        @if (!DayActivities.Any())
         {
-            <div class="empty-day">Rien de prévu ce jour-là pour l'instant.</div>
+            <div class="empty-day">
+                @(_hideEveryone && _day.Activities.Any()
+                    ? "Aucune tâche assignée à quelqu'un en particulier ce jour-là."
+                    : "Rien de prévu ce jour-là pour l'instant.")
+            </div>
         }
     }
 
@@ -220,6 +233,7 @@ else
     private WeddingDay? _day;
 
     private bool _calView;
+    private bool _hideEveryone;
 
     private bool _editingLabel;
     private string? _editLabel;
@@ -236,15 +250,20 @@ else
     private WeddingDay? NextDay => _day is null ? null
         : Store.OrderedDays.SkipWhile(d => d.Date <= _day.Date).FirstOrDefault();
 
+    /// <summary>Tâches du jour, filtrées selon la case « Masquer Tout le monde ».</summary>
+    private IEnumerable<TaskItem> DayActivities =>
+        _day is null ? []
+        : _hideEveryone ? _day.Activities.Where(t => t.AssignedTo.Count > 0)
+        : _day.Activities;
+
     private IEnumerable<TaskItem> UntimedTasks =>
-        _day?.Activities.Where(t => t.Time is null) ?? [];
+        DayActivities.Where(t => t.Time is null);
 
     private IEnumerable<IGrouping<string, TaskItem>> TimedGroups =>
-        _day?.Activities
+        DayActivities
             .Where(t => t.Time is not null)
             .OrderBy(t => t.Time, StringComparer.Ordinal)
-            .GroupBy(t => t.Time!)
-        ?? Enumerable.Empty<IGrouping<string, TaskItem>>();
+            .GroupBy(t => t.Time!);
 
     private int TotalCount => _day?.Activities.Count ?? 0;
     private int DoneCount => _day?.Activities.Count(t => t.IsDone) ?? 0;
@@ -256,7 +275,7 @@ else
         get
         {
             if (_day is null) return [];
-            var timed = _day.Activities.Where(t => t.Time is not null).ToList();
+            var timed = DayActivities.Where(t => t.Time is not null).ToList();
             if (!timed.Any()) return [];
             var hours = timed.Select(t => int.Parse(t.Time!.Split(':')[0]));
             var min = hours.Min();
@@ -266,11 +285,10 @@ else
     }
 
     private Dictionary<int, List<TaskItem>> CalTasksByHour =>
-        _day?.Activities
+        DayActivities
             .Where(t => t.Time is not null)
             .GroupBy(t => int.Parse(t.Time!.Split(':')[0]))
-            .ToDictionary(g => g.Key, g => g.OrderBy(t => t.Time).ToList())
-        ?? [];
+            .ToDictionary(g => g.Key, g => g.OrderBy(t => t.Time).ToList());
 
     private async Task CalToggleDoneAsync(TaskItem task)
     {
