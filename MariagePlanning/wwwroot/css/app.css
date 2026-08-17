@@ -2663,13 +2663,19 @@ button.tile:disabled { opacity: 0.45; }
         display: flex !important;
     }
 
+    /* Les jours s'enchaînent en continu : pas de saut de page forcé,
+       on évite seulement de couper l'en-tête du jour de son contenu. */
     .day-card {
-        break-inside: avoid;
-        page-break-inside: avoid;
         margin-bottom: 6px;
         border-radius: 4px;
     }
 
+    .day-summary {
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    /* On garde chaque tâche entière (pas coupée en bas de page). */
     .task-card {
         break-inside: avoid;
         page-break-inside: avoid;
